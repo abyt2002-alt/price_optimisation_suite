@@ -1751,7 +1751,9 @@ const AspDeterminationPage = () => {
             <div className="space-y-4 p-4">
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
                 <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">AI Intent</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    State your business intent to simulate scenarios
+                  </label>
                   <textarea
                     value={controls.prompt}
                     onChange={(event) => applyControlPatch({ prompt: event.target.value })}
@@ -1763,45 +1765,40 @@ const AspDeterminationPage = () => {
                     Example: protect premium margin while improving core revenue.
                   </p>
                 </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Minimum Gross Margin</label>
-                  <div className="relative mt-1.5">
-                    <input
-                      type="number"
-                      min={20}
-                      max={60}
-                      step={1}
-                      value={controls.grossMarginPct}
-                      onChange={(event) => applyControlPatch({ grossMarginPct: clamp(Number(event.target.value) || 0, 20, 60) })}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-8 text-sm font-semibold text-slate-800 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">%</span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => runOptimization(true)}
-                      disabled={isRunningOptimization}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2.5 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isRunningOptimization ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                      {isRunningOptimization ? 'Running...' : 'Run'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetControls}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Reset
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[11px] font-medium text-slate-500">
-                    Run after updating intent, margin and product bounds.
-                  </p>
-                </div>
               </div>
+
+              <AspInputGuardrailsPanel
+                controls={controls}
+                onControlsChange={applyControlPatch}
+                products={monthProducts}
+                productConstraints={productConstraints}
+                onProductConstraintChange={handleProductConstraintChange}
+                onResetProductConstraints={handleResetProductConstraints}
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => runOptimization(true)}
+                  disabled={isRunningOptimization}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2.5 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isRunningOptimization ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  {isRunningOptimization ? 'Running...' : 'Run'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetControls}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </button>
+              </div>
+
+              <p className="text-[11px] font-medium text-slate-500">
+                Run after updating intent, margin and product bounds.
+              </p>
 
               {isRunningOptimization && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
@@ -1816,15 +1813,6 @@ const AspDeterminationPage = () => {
                   </div>
                 </div>
               )}
-
-              <AspInputGuardrailsPanel
-                controls={controls}
-                onControlsChange={applyControlPatch}
-                products={monthProducts}
-                productConstraints={productConstraints}
-                onProductConstraintChange={handleProductConstraintChange}
-                onResetProductConstraints={handleResetProductConstraints}
-              />
             </div>
           ) : uiStage !== 'setup' ? (
             <div className="px-4 py-2 text-xs font-medium text-slate-600">
@@ -1995,22 +1983,48 @@ const AspDeterminationPage = () => {
                           </div>
                           <div className="max-h-[360px] overflow-auto">
                             {segment.rows.length ? (
-                              segment.rows.map((row) => (
-                                <div
-                                  key={`${scenarioConfirm.scenarioId}_${segment.segmentKey}_${row.productName}`}
-                                  className="grid grid-cols-[minmax(140px,1fr)_78px_20px_86px] items-start gap-2 border-b border-slate-100 px-2 py-1.5 last:border-b-0"
-                                >
-                                  <p
-                                    className="whitespace-normal break-words text-[11px] font-semibold leading-4 text-slate-800"
-                                    title={normalizeProductLabel(row.productName)}
+                              segment.rows.map((row) => {
+                                const base = Number(row.basePrice ?? 0)
+                                const rec = Number(row.recommendedPrice ?? 0)
+                                const delta = rec - base
+                                const isChanged = Math.abs(delta) > 0.0001
+                                const isIncrease = isChanged && delta > 0
+                                const isDecrease = isChanged && delta < 0
+
+                                const highlightBg = isIncrease
+                                  ? 'bg-emerald-100 border-l-4 border-emerald-500'
+                                  : isDecrease
+                                    ? 'bg-rose-100 border-l-4 border-rose-500'
+                                    : ''
+                                const baseText = isIncrease
+                                  ? 'text-emerald-800 font-extrabold'
+                                  : isDecrease
+                                    ? 'text-rose-800 font-extrabold'
+                                    : 'text-slate-700'
+                                const recText = isIncrease
+                                  ? 'text-emerald-950 font-extrabold'
+                                  : isDecrease
+                                    ? 'text-rose-950 font-extrabold'
+                                    : 'text-slate-900'
+                                const arrowText = isIncrease ? 'text-emerald-700 font-extrabold' : isDecrease ? 'text-rose-700 font-extrabold' : ''
+
+                                return (
+                                  <div
+                                    key={`${scenarioConfirm.scenarioId}_${segment.segmentKey}_${row.productName}`}
+                                    className={`grid grid-cols-[minmax(140px,1fr)_78px_20px_86px] items-start gap-2 border-b border-slate-100 px-2 py-1.5 last:border-b-0 ${highlightBg}`}
                                   >
-                                    {normalizeProductLabel(row.productName)}
-                                  </p>
-                                  <p className="text-right text-[11px] font-semibold text-slate-700">{formatInr(row.basePrice)}</p>
-                                  <p className="text-center text-[11px] font-bold text-slate-500">-&gt;</p>
-                                  <p className="text-right text-[11px] font-semibold text-slate-900">{formatInr(row.recommendedPrice)}</p>
-                                </div>
-                              ))
+                                    <p
+                                      className="whitespace-normal break-words text-[11px] font-semibold leading-4 text-slate-800"
+                                      title={normalizeProductLabel(row.productName)}
+                                    >
+                                      {normalizeProductLabel(row.productName)}
+                                    </p>
+                                    <p className={`text-right text-[11px] font-semibold ${baseText}`}>{formatInr(base)}</p>
+                                    <p className={`text-center text-[11px] font-bold text-slate-500 ${arrowText}`}>-&gt;</p>
+                                    <p className={`text-right text-[11px] font-semibold ${recText}`}>{formatInr(rec)}</p>
+                                  </div>
+                                )
+                              })
                             ) : (
                               <div className="px-2 py-3 text-center text-[11px] text-slate-500">
                                 No products in this segment.
