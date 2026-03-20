@@ -1,6 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 
-const COLORS = ['#458EE2', '#41C185', '#FFBD59', '#7CB5EC', '#7ED9AE', '#F7C97A', '#B6C2CF', '#FF7F7F']
+const COLORS = ['#2563EB', '#16A34A', '#F97316', '#F59E0B', '#64748B', '#DC2626', '#2563EB', '#16A34A']
 
 const MarketShareTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) {
@@ -82,3 +82,4 @@ const MarketShareChart = ({ shareRows, totalVolume, monthLabel }) => {
 }
 
 export default MarketShareChart
+

@@ -7,10 +7,11 @@ const CurrentAspLadderChart = ({ rows }) => {
       rows={rows}
       aspKey="currentAsp"
       volumeKey="currentVolume"
-      lineColor="#458EE2"
-      barColor="#458EE2"
+      lineColor="#2563EB"
+      barColor="#2563EB"
     />
   )
 }
 
 export default CurrentAspLadderChart
+

@@ -170,7 +170,7 @@ const RevenueCurveChart = ({ points, currentPoint, maxPoint, visible = true }) =
                 offset: -6,
                 fontSize: 12,
                 fontWeight: 700,
-                fill: '#334155',
+                fill: '#0F172A',
               }}
             />
             <YAxis
@@ -185,7 +185,7 @@ const RevenueCurveChart = ({ points, currentPoint, maxPoint, visible = true }) =
                 position: 'insideLeft',
                 fontSize: 12,
                 fontWeight: 700,
-                fill: '#334155',
+                fill: '#0F172A',
               }}
             />
             <Tooltip content={<RevenueTooltip />} />
@@ -193,7 +193,7 @@ const RevenueCurveChart = ({ points, currentPoint, maxPoint, visible = true }) =
               type="linear"
               dataKey="revenue"
               stroke="none"
-              fill="#41C185"
+              fill="#16A34A"
               fillOpacity={0.14}
               isAnimationActive
               animationDuration={900}
@@ -202,10 +202,10 @@ const RevenueCurveChart = ({ points, currentPoint, maxPoint, visible = true }) =
             <Line
               type="linear"
               dataKey="revenue"
-              stroke="#41C185"
+              stroke="#16A34A"
               strokeWidth={3}
               dot={false}
-              activeDot={{ r: 4, fill: '#ffffff', stroke: '#41C185', strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: '#ffffff', stroke: '#16A34A', strokeWidth: 2 }}
               isAnimationActive
               animationDuration={1000}
               animationEasing="ease-out"
@@ -214,21 +214,21 @@ const RevenueCurveChart = ({ points, currentPoint, maxPoint, visible = true }) =
               x={currentPlotPoint.price}
               y={currentPlotPoint.revenue}
               r={6}
-              fill="#458EE2"
-              stroke="#1D4ED8"
+              fill="#2563EB"
+              stroke="#2563EB"
               strokeWidth={2}
               isFront
-              label={{ value: 'Current', position: labelsTooClose ? 'top' : 'bottom', fill: '#334155', fontSize: 11 }}
+              label={{ value: 'Current', position: labelsTooClose ? 'top' : 'bottom', fill: '#0F172A', fontSize: 11 }}
             />
             <ReferenceDot
               x={maxPlotPoint.price}
               y={maxPlotPoint.revenue}
               r={6}
-              fill="#FFBD59"
-              stroke="#D97706"
+              fill="#F59E0B"
+              stroke="#F59E0B"
               strokeWidth={2}
               isFront
-              label={{ value: 'Max', position: labelsTooClose ? 'bottom' : 'top', fill: '#334155', fontSize: 11 }}
+              label={{ value: 'Max', position: labelsTooClose ? 'bottom' : 'top', fill: '#0F172A', fontSize: 11 }}
             />
           </ComposedChart>
         ) : (
@@ -241,3 +241,5 @@ const RevenueCurveChart = ({ points, currentPoint, maxPoint, visible = true }) =
 }
 
 export default RevenueCurveChart
+
+

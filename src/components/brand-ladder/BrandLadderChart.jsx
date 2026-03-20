@@ -44,7 +44,7 @@ const BrandLadderChart = ({ data, title, showVolume }) => {
             <Tooltip content={<BrandLadderTooltip />} />
 
             {showVolume && (
-              <Bar yAxisId="volume" dataKey="volume" name="Volume" fill="#41C185" fillOpacity={0.24} radius={[6, 6, 0, 0]} />
+              <Bar yAxisId="volume" dataKey="volume" name="Volume" fill="#16A34A" fillOpacity={0.24} radius={[6, 6, 0, 0]} />
             )}
 
             <Line
@@ -52,9 +52,9 @@ const BrandLadderChart = ({ data, title, showVolume }) => {
               type="stepAfter"
               dataKey="basePrice"
               name="Base Price Ladder"
-              stroke="#458EE2"
+              stroke="#2563EB"
               strokeWidth={3}
-              dot={{ r: 5, fill: '#458EE2', stroke: '#1D4ED8', strokeWidth: 1.5 }}
+              dot={{ r: 5, fill: '#2563EB', stroke: '#2563EB', strokeWidth: 1.5 }}
               activeDot={{ r: 7 }}
             >
               <LabelList dataKey="basePrice" position="top" formatter={(value) => `${value}`} className="fill-slate-600 text-[10px]" />
@@ -67,3 +67,5 @@ const BrandLadderChart = ({ data, title, showVolume }) => {
 }
 
 export default BrandLadderChart
+
+

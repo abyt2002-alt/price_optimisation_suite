@@ -55,7 +55,7 @@ const CompetitorComparisonChart = ({ chartData, seriesMeta, showVolume, monthLab
             <Legend />
 
             {showVolume && (
-              <Bar yAxisId="volume" dataKey="ownVolume" name="MSG Volume" fill="#41C185" fillOpacity={0.2} radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="volume" dataKey="ownVolume" name="MSG Volume" fill="#16A34A" fillOpacity={0.2} radius={[4, 4, 0, 0]} />
             )}
 
             {seriesMeta.map((series) => (
@@ -80,3 +80,4 @@ const CompetitorComparisonChart = ({ chartData, seriesMeta, showVolume, monthLab
 }
 
 export default CompetitorComparisonChart
+

@@ -142,12 +142,12 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
           >
             <defs>
               <linearGradient id="demandCurrentGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#458EE2" stopOpacity={0.30} />
-                <stop offset="95%" stopColor="#458EE2" stopOpacity={0.06} />
+                <stop offset="5%" stopColor="#2563EB" stopOpacity={0.30} />
+                <stop offset="95%" stopColor="#2563EB" stopOpacity={0.06} />
               </linearGradient>
               <linearGradient id="demandMaxGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#FFBD59" stopOpacity={0.26} />
-                <stop offset="95%" stopColor="#FFBD59" stopOpacity={0.04} />
+                <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.26} />
+                <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.04} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
@@ -164,7 +164,7 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
                 offset: -6,
                 fontSize: 12,
                 fontWeight: 700,
-                fill: '#334155',
+                fill: '#0F172A',
               }}
             />
             <YAxis
@@ -179,7 +179,7 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
                 position: 'insideLeft',
                 fontSize: 12,
                 fontWeight: 700,
-                fill: '#334155',
+                fill: '#0F172A',
               }}
             />
             <Tooltip content={<DemandTooltip />} />
@@ -204,10 +204,10 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
             <Line
               type="linear"
               dataKey="predictedDemand"
-              stroke="#458EE2"
+              stroke="#2563EB"
               strokeWidth={3}
               dot={false}
-              activeDot={{ r: 4, fill: '#ffffff', stroke: '#458EE2', strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: '#ffffff', stroke: '#2563EB', strokeWidth: 2 }}
               isAnimationActive
               animationDuration={950}
               animationEasing="ease-out"
@@ -216,14 +216,14 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
               x={currentPlotPoint.price}
               y={currentPlotPoint.predictedDemand}
               r={6}
-              fill="#458EE2"
-              stroke="#1D4ED8"
+              fill="#2563EB"
+              stroke="#2563EB"
               strokeWidth={2}
               isFront
               label={{
                 value: 'Current',
                 position: labelsTooClose ? 'top' : 'bottom',
-                fill: '#334155',
+                fill: '#0F172A',
                 fontSize: 11,
               }}
             />
@@ -231,14 +231,14 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
               x={maxPoint.price}
               y={maxPoint.predictedDemand}
               r={5}
-              fill="#FFBD59"
-              stroke="#D97706"
+              fill="#F59E0B"
+              stroke="#F59E0B"
               strokeWidth={2}
               isFront
               label={{
                 value: 'Max',
                 position: labelsTooClose ? 'bottom' : 'top',
-                fill: '#334155',
+                fill: '#0F172A',
                 fontSize: 11,
               }}
             />
@@ -253,3 +253,5 @@ const DemandCurveChart = ({ points, currentPoint, maxRevenuePrice, visible = tru
 }
 
 export default DemandCurveChart
+
+

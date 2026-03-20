@@ -223,7 +223,7 @@ export const buildCrossElasticityMatrix = (monthRows, sensitivity = 'base') => {
       // Stronger effect at same price, tapering to weaker effect at ±100.
       const closeness = 1 - priceGap / interactionWindow
       const baseValue = 0.08 + closeness * 0.32
-      const crossElasticity = Number((-clamp(baseValue * sensitivityFactor, 0.05, 0.45)).toFixed(2))
+      const crossElasticity = Number(clamp(baseValue * sensitivityFactor, 0.05, 0.45).toFixed(2))
 
       return { productName: colRow.productName, value: crossElasticity, isSelf: false }
     })

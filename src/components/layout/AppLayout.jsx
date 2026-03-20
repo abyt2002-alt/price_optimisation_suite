@@ -6,7 +6,6 @@ import {
   Menu,
   Settings,
   SlidersHorizontal,
-  GitCompareArrows,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -15,8 +14,7 @@ const navigation = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Brand Ladder', href: '/portfolio?step=1', icon: BarChart3, step: '1' },
   { name: 'Insights', href: '/portfolio?step=2', icon: SlidersHorizontal, step: '2' },
-  { name: 'ASP Determination', href: '/portfolio?step=3', icon: LineChart, step: '3' },
-  { name: 'Scenario Compare', href: '/portfolio?step=4', icon: GitCompareArrows, step: '4' },
+  { name: 'Base Ladder Detection', href: '/portfolio?step=3', icon: LineChart, step: '3' },
 ]
 
 const AppLayout = ({ children, rightSidebar }) => {
@@ -127,7 +125,7 @@ const AppLayout = ({ children, rightSidebar }) => {
 
         {rightSidebar && (
           <>
-            <aside className="hidden w-80 flex-shrink-0 border-l border-slate-200 bg-white lg:block xl:w-96">
+            <aside className="hidden w-80 flex-shrink-0 border-l border-slate-200 bg-white lg:block">
               <div className="flex h-full flex-col">
                 <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white p-4">
                   <Settings className="h-5 w-5 text-brand.blue" />

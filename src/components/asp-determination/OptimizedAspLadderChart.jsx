@@ -7,10 +7,11 @@ const OptimizedAspLadderChart = ({ rows }) => {
       rows={rows}
       aspKey="optimizedAsp"
       volumeKey="optimizedVolume"
-      lineColor="#41C185"
-      barColor="#41C185"
+      lineColor="#16A34A"
+      barColor="#16A34A"
     />
   )
 }
 
 export default OptimizedAspLadderChart
+

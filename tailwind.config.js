@@ -4,10 +4,15 @@ export default {
     extend: {
       colors: {
         brand: {
-          yellow: '#FFBD59',
-          green: '#41C185',
-          blue: '#458EE2',
-          red: '#FF7F7F',
+          blue: '#2563EB',
+          orange: '#F97316',
+          green: '#16A34A',
+          amber: '#F59E0B',
+          red: '#DC2626',
+          slate: '#64748B',
+          ink: '#0F172A',
+          grid: '#E2E8F0',
+          yellow: '#F59E0B',
         },
       },
       boxShadow: {

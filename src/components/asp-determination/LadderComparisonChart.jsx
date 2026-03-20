@@ -8,43 +8,123 @@ import {
   YAxis,
 } from 'recharts'
 
-const ComparisonTooltip = ({ active, payload }) => {
-  if (!active || !payload?.length) {
-    return null
-  }
+const SEGMENT_COLORS = {
+  daily: '#2563EB',
+  core: '#F97316',
+  premium: '#16A34A',
+}
 
+const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)
+const formatCurrency = (value) => `INR ${formatInt(value)}`
+
+const ComparisonTooltip = ({ active, payload, showComparison = true }) => {
+  if (!active || !payload?.length) return null
   const point = payload[0].payload
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <p className="text-sm font-semibold text-slate-800">{point.productName}</p>
-      <p className="text-xs text-slate-600">Base ASP: {point.baseAsp.toFixed(1)}</p>
-      <p className="text-xs text-slate-600">Optimized ASP: {point.optimizedAsp.toFixed(1)}</p>
-      <p className="text-xs text-slate-600">Change: {point.basePriceChange >= 0 ? '+' : ''}{point.basePriceChange.toFixed(1)}</p>
+      <p className="text-xs text-slate-600">Segment: {point.segmentLabel}</p>
+      <p className="text-xs text-slate-600">Base Price: {formatCurrency(point.baseAsp)}</p>
+      {showComparison ? (
+        <p className="text-xs text-slate-600">Recommended Base: {formatCurrency(point.optimizedAsp)}</p>
+      ) : null}
+      <p className="text-xs text-slate-600">Base Volume: {formatInt(point.currentVolume)}</p>
+      {showComparison ? (
+        <p className="text-xs text-slate-600">Recommended Volume: {formatInt(point.optimizedVolume)}</p>
+      ) : null}
     </div>
   )
 }
 
-const LadderComparisonChart = ({ rows }) => {
-  const ladderRows = [...rows].sort(
-    (a, b) => (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName),
-  )
+const renderSegmentDot = (props) => {
+  const { cx, cy, payload } = props
+  if (cx === undefined || cy === undefined || !payload) return null
+  const color = SEGMENT_COLORS[payload.segmentKey] ?? '#64748B'
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#ffffff" strokeWidth={1.5} />
+}
+
+const LadderComparisonChart = ({ rows = [], showComparison = true }) => {
+  const ladderRows = rows
+    .slice()
+    .sort((a, b) => (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName))
+    .map((row) => {
+      const segmentKey = row.segmentKey ?? 'core'
+      return {
+        ...row,
+        segmentKey,
+        segmentLabel: row.segmentLabel ?? (segmentKey === 'daily' ? 'Daily Casual' : segmentKey === 'core' ? 'Core Plus' : 'Premium'),
+      }
+    })
 
   return (
     <div className="panel p-4">
-      <h3 className="text-lg font-bold text-slate-800">ASP Ladder View</h3>
-      <p className="mt-1 text-xs text-slate-500">Base-to-optimized stair-step ladder by product.</p>
+      <h3 className="text-lg font-bold text-slate-800">Full Brand Ladder (Segment Colors)</h3>
+      <p className="mt-1 text-xs text-slate-500">
+        {showComparison
+          ? 'Unified base vs recommended stair-step ladder across all products.'
+          : 'Unified base ladder across all products.'}
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-600">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-[#2563EB]" />
+          Daily Casual
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-[#F97316]" />
+          Core Plus
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-[#16A34A]" />
+          Premium
+        </span>
+      </div>
+
       <div className="mt-3 h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={ladderRows} margin={{ top: 20, right: 16, left: 4, bottom: 12 }}>
+          <ComposedChart data={ladderRows} margin={{ top: 14, right: 16, left: 2, bottom: 18 }}>
             <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
-            <XAxis dataKey="productName" tick={{ fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={66} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip content={<ComparisonTooltip />} />
-            <Line type="stepAfter" dataKey="baseAsp" stroke="#458EE2" strokeWidth={2.5} dot={{ r: 4 }} name="Base ASP" />
-            <Line type="stepAfter" dataKey="optimizedAsp" stroke="#41C185" strokeWidth={3} dot={{ r: 5 }} name="Optimized ASP" />
+            <XAxis dataKey="productName" tick={{ fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={72} />
+            <YAxis tick={{ fontSize: 11, fontWeight: 600 }} />
+            <Tooltip content={<ComparisonTooltip showComparison={showComparison} />} />
+            <Line
+              type="stepAfter"
+              dataKey="baseAsp"
+              stroke="#64748B"
+              strokeWidth={2.2}
+              strokeDasharray="5 4"
+              dot={renderSegmentDot}
+              name={showComparison ? 'Current Ladder' : 'Base Ladder'}
+            />
+            {showComparison ? (
+              <Line
+                type="stepAfter"
+                dataKey="optimizedAsp"
+                stroke="#16A34A"
+                strokeWidth={2.5}
+                dot={renderSegmentDot}
+                name="Optimized Ladder"
+              />
+            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-5 border-t border-slate-200 pt-2 text-[11px] font-semibold text-slate-700">
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="inline-block h-0 w-6 border-t-[2.5px] border-[#64748B]"
+            style={{ borderTopStyle: 'dashed' }}
+          />
+          {showComparison ? 'Current Ladder' : 'Base Ladder'}
+        </span>
+        {showComparison ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-block h-0 w-6 border-t-[2.5px] border-[#16A34A]" />
+            Optimized Ladder
+          </span>
+        ) : null}
       </div>
     </div>
   )

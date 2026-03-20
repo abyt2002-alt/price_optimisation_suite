@@ -15,9 +15,9 @@ const strengthLabel = (value) => {
 const cellTone = (value) => {
   if (value == null) return 'bg-slate-100 text-slate-400'
   if (value === 0) return 'bg-white text-slate-300'
-  if (value <= -0.35) return 'bg-rose-200 text-rose-900'
-  if (value <= -0.25) return 'bg-rose-100 text-rose-800'
-  if (value <= -0.15) return 'bg-rose-50 text-rose-700'
+  if (value >= 0.35) return 'bg-emerald-200 text-emerald-900'
+  if (value >= 0.25) return 'bg-emerald-100 text-emerald-800'
+  if (value >= 0.15) return 'bg-emerald-50 text-emerald-700'
   return 'bg-slate-50 text-slate-600'
 }
 
@@ -147,7 +147,7 @@ const CrossElasticityMatrix = ({
                       <td className="px-3 py-2 text-slate-700">
                         <ProductCellLabel name={row.otherProduct} />
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold text-rose-700">{row.crossElasticity.toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-emerald-700">{row.crossElasticity.toFixed(2)}</td>
                       <td className="px-3 py-2 text-right">
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                           {strengthLabel(row.crossElasticity)}

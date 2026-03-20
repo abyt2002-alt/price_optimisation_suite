@@ -47,6 +47,11 @@ const PortfolioWorkflowPage = () => {
       }
     }
 
+    if (searchParams.get('step') === '4') {
+      next.set('step', '3')
+      dirty = true
+    }
+
     if (next.has('competitor')) {
       next.delete('competitor')
       dirty = true

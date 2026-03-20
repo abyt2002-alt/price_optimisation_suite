@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-ObjectiveType = Literal["revenue", "profit", "volume"]
+ObjectiveType = Literal["revenue", "profit"]
 
 
 class AspOptimizationRequest(BaseModel):
@@ -18,18 +18,12 @@ class AspOptimizationRequest(BaseModel):
     selected_channel: Optional[str] = None
 
     optimization_objective: ObjectiveType = "revenue"
-    max_price_change_pct: float = Field(default=12.0, ge=0.1, le=60.0)
-    minimum_price_gap: float = Field(default=0.0, ge=0.0, le=200.0)
-    minimum_volume_retention_pct: float = Field(default=75.0, ge=1.0, le=100.0)
-    minimum_volume_retention_pct_by_product: Optional[dict[str, float]] = None
-
-    enforce_revenue_floor: bool = False
-    enforce_profit_floor: bool = False
-    revenue_floor_value: Optional[float] = Field(default=None, ge=0.0)
-    profit_floor_value: Optional[float] = Field(default=None, ge=0.0)
-    minimum_revenue_drop_pct_from_current: Optional[float] = Field(default=None, ge=0.0, le=100.0)
-    minimum_profit_drop_pct_from_current: Optional[float] = Field(default=None, ge=0.0, le=100.0)
-    allowed_profit_decrease_pct: float = Field(default=0.0, ge=0.0, le=100.0)
+    gross_margin_pct: float = Field(default=40.0, ge=20.0, le=60.0)
+    prompt: str = ""
+    scenario_count: int = Field(default=1000, ge=1, le=1000)
+    segment_constraints: dict[str, dict[str, float | bool]] = Field(default_factory=dict)
+    product_constraints: dict[str, dict[str, float | bool]] = Field(default_factory=dict)
+    scenario_filters: dict[str, float] = Field(default_factory=dict)
 
 
 class ProductOptimizationResult(BaseModel):
@@ -72,13 +66,66 @@ class OptimizationModelContext(BaseModel):
     own_elasticities: list[float]
     beta_ppu: list[float]
     cross_matrix: list[list[float]]
+    gamma_matrix: list[list[float]]
+    base_prices: list[float]
+    base_volumes: list[float]
+
+
+class ScenarioSummary(BaseModel):
+    scenario_id: str
+    scenario_name: Optional[str] = None
+    scenario_family: Optional[str] = None
+    rank: int
+    objective_value: float
+    total_volume: float
+    total_revenue: float
+    total_profit: float
+    revenue_uplift_pct: float
+    profit_uplift_pct: float
+    volume_uplift_pct: float
+
+
+class ScenarioDetail(BaseModel):
+    scenario_id: str
+    totals: PortfolioTotals
+    summary: SummaryMetrics
+    product_results: list[ProductOptimizationResult]
 
 
 class AspOptimizationResponse(BaseModel):
     controls: AspOptimizationRequest
     selected_month: str
+    selected_scenario_id: str
+    base_totals: PortfolioTotals
     current_totals: PortfolioTotals
     optimized_totals: PortfolioTotals
     product_results: list[ProductOptimizationResult]
     summary: SummaryMetrics
+    scenario_summaries: list[ScenarioSummary]
+    scenario_details: dict[str, ScenarioDetail]
     model_context: OptimizationModelContext
+    ai_metadata: dict[str, object] = Field(default_factory=dict)
+
+
+JobStatusType = Literal["queued", "running", "completed", "failed"]
+
+
+class AspOptimizationJobCreateResponse(BaseModel):
+    job_id: str
+    status: JobStatusType
+    message: str
+
+
+class AspOptimizationJobStatusResponse(BaseModel):
+    job_id: str
+    status: JobStatusType
+    progress_pct: int = Field(default=0, ge=0, le=100)
+    stage: str = ""
+    error: Optional[str] = None
+
+
+class AspOptimizationJobResultResponse(BaseModel):
+    job_id: str
+    status: JobStatusType
+    result: Optional[AspOptimizationResponse] = None
+    error: Optional[str] = None

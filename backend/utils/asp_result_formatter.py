@@ -26,8 +26,9 @@ def build_product_results(
     results: list[dict[str, float | str]] = []
     for idx, row in enumerate(sorted_rows):
         base_price = float(row.get("basePrice", row.get("currentPrice", 0.0)))
-        current_price = float(row["currentPrice"])
-        current_volume = float(row["volume"])
+        # Step 3 baseline must be the base ladder anchor, not observed current month values.
+        current_price = base_price
+        current_volume = float(row.get("baseVolume", row.get("volume", 0.0)))
         optimized_price = float(optimized_prices[idx])
         optimized_volume = float(max(0.0, optimized_volumes[idx]))
         unit_cost = float(unit_costs[idx])

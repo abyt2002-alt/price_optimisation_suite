@@ -159,7 +159,10 @@ def convert_to_base_reference(
             for j in range(len(sorted_rows))
             if j != i
         )
-        q_base = current_volumes[i] - own_backcast - cross_backcast
+        # Keep base-reference conversion aligned with response model sign convention:
+        # q_current = q_base + own_term - cross_term
+        # => q_base = q_current - own_term + cross_term
+        q_base = current_volumes[i] - own_backcast + cross_backcast
         base_volumes.append(max(1.0, q_base))
 
     own_elasticities_base: list[float] = []
