@@ -111,8 +111,6 @@ const SegmentWorkspacePanel = ({
   const renderProductSignals = (row) => {
     const contributionPct = getRevenueContributionPct(row)
     const elasticity = parseNumeric(row.ownElasticity, -1)
-    const contributionWidth = Math.max(0, Math.min(100, contributionPct))
-    const elasticityWidth = toElasticityLinePct(elasticity)
 
     return (
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(140px,170px)_minmax(140px,170px)] items-center gap-2">
@@ -124,17 +122,11 @@ const SegmentWorkspacePanel = ({
             <span className="text-slate-500">E</span>
             <span className="text-[#2563EB]">{formatElasticity(elasticity)}</span>
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${elasticityWidth}%` }} />
-          </div>
         </div>
         <div className="rounded border border-slate-200 bg-white px-1.5 py-1">
           <div className="flex items-center justify-between text-[10px] font-semibold">
             <span className="text-slate-500">Contr</span>
             <span className="text-emerald-700">{formatPct(contributionPct)}</span>
-          </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${contributionWidth}%` }} />
           </div>
         </div>
       </div>
@@ -248,39 +240,53 @@ const SegmentWorkspacePanel = ({
           <div className="overflow-x-auto">
             {isBaseOnly ? (
               <>
-                <div className="grid min-w-[760px] grid-cols-[minmax(0,1.8fr)_180px_110px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <div className="grid min-w-[1180px] grid-cols-[minmax(0,1.6fr)_140px_210px_220px_120px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   <span>Product</span>
+                  <span className="text-right">Elasticity</span>
+                  <span className="text-right">Contribution to Sales</span>
                   <span className="text-right">Base Price</span>
-                  <span className="text-right">Volume</span>
+                  <span className="text-right">Volume change</span>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {detailRows.map((row) => (
-                    <div
-                      key={row.productName}
-                      className="grid min-w-[760px] grid-cols-[minmax(0,1.8fr)_180px_110px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
-                    >
-                      <div className="min-w-0">{renderProductSignals(row)}</div>
-                      <div className="w-full space-y-1">
-                        <div className="text-right text-[12px] font-bold text-slate-700">
-                          INR {Math.round(parseNumeric(baseInputValues?.[row.productName], row.baseAsp))}
+                    (() => {
+                      const elasticity = parseNumeric(row.ownElasticity, -1)
+                      const contributionPct = getRevenueContributionPct(row)
+                      return (
+                        <div
+                          key={row.productName}
+                          className="grid min-w-[1180px] grid-cols-[minmax(0,1.6fr)_140px_210px_220px_120px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
+                        >
+                          <div className="min-w-0 line-clamp-2 break-words text-[13px] font-semibold leading-4 text-slate-800">
+                            {normalizeProductLabel(row.productName)}
+                          </div>
+                          <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
+                          <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
+                          <div className="w-full space-y-1">
+                            <div className="text-right text-[12px] font-bold text-slate-700">
+                              INR {Math.round(parseNumeric(baseInputValues?.[row.productName], row.baseAsp))}
+                            </div>
+                            <input
+                              type="range"
+                              min={getSliderBounds(row.baseAsp).min}
+                              max={getSliderBounds(row.baseAsp).max}
+                              step={50}
+                              value={getSliderValue(baseInputValues?.[row.productName] ?? row.baseAsp, row.baseAsp)}
+                              onChange={(event) => handleBaseSliderChange(row, event.target.value)}
+                              className="h-1.5 w-full cursor-pointer accent-[#2563EB]"
+                              aria-label={`${row.productName} base price slider`}
+                            />
+                          </div>
+                          <div className="text-right">
+                            <span
+                              className={`inline-flex rounded-full border px-1.5 py-0.5 text-[11px] font-bold ${volumeTone(row.volumeChangePct ?? 0)}`}
+                            >
+                              {formatSignedPct(row.volumeChangePct ?? 0)}
+                            </span>
+                          </div>
                         </div>
-                        <input
-                          type="range"
-                          min={getSliderBounds(row.baseAsp).min}
-                          max={getSliderBounds(row.baseAsp).max}
-                          step={50}
-                          value={getSliderValue(baseInputValues?.[row.productName] ?? row.baseAsp, row.baseAsp)}
-                          onChange={(event) => handleBaseSliderChange(row, event.target.value)}
-                          className="h-1.5 w-full cursor-pointer accent-[#2563EB]"
-                          aria-label={`${row.productName} base price slider`}
-                        />
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[11px] font-bold ${volumeTone(row.volumeChangePct ?? 0)}`}>
-                          {formatSignedPct(row.volumeChangePct ?? 0)}
-                        </span>
-                      </div>
-                    </div>
+                      )
+                    })()
                   ))}
                 </div>
               </>
