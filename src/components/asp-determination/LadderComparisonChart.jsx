@@ -17,7 +17,7 @@ const SEGMENT_COLORS = {
 const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)
 const formatCurrency = (value) => `INR ${formatInt(value)}`
 
-const ComparisonTooltip = ({ active, payload, showComparison = true }) => {
+const ComparisonTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
   const point = payload[0].payload
 
@@ -25,14 +25,10 @@ const ComparisonTooltip = ({ active, payload, showComparison = true }) => {
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <p className="text-sm font-semibold text-slate-800">{point.productName}</p>
       <p className="text-xs text-slate-600">Segment: {point.segmentLabel}</p>
-      <p className="text-xs text-slate-600">Base Price: {formatCurrency(point.baseAsp)}</p>
-      {showComparison ? (
-        <p className="text-xs text-slate-600">Recommended Base: {formatCurrency(point.optimizedAsp)}</p>
-      ) : null}
+      <p className="text-xs text-slate-600">Base: {formatCurrency(point.baseAsp)}</p>
+      <p className="text-xs text-slate-600">Adjusted: {formatCurrency(point.optimizedAsp)}</p>
       <p className="text-xs text-slate-600">Base Volume: {formatInt(point.currentVolume)}</p>
-      {showComparison ? (
-        <p className="text-xs text-slate-600">Recommended Volume: {formatInt(point.optimizedVolume)}</p>
-      ) : null}
+      <p className="text-xs text-slate-600">Adjusted Volume: {formatInt(point.optimizedVolume)}</p>
     </div>
   )
 }
@@ -44,10 +40,13 @@ const renderSegmentDot = (props) => {
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#ffffff" strokeWidth={1.5} />
 }
 
-const LadderComparisonChart = ({ rows = [], showComparison = true }) => {
+const LadderComparisonChart = ({ rows = [] }) => {
   const ladderRows = rows
     .slice()
-    .sort((a, b) => (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName))
+    .sort(
+      (a, b) =>
+        (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName),
+    )
     .map((row) => {
       const segmentKey = row.segmentKey ?? 'core'
       return {
@@ -61,9 +60,7 @@ const LadderComparisonChart = ({ rows = [], showComparison = true }) => {
     <div className="panel p-4">
       <h3 className="text-lg font-bold text-slate-800">Full Brand Ladder (Segment Colors)</h3>
       <p className="mt-1 text-xs text-slate-500">
-        {showComparison
-          ? 'Unified base vs recommended stair-step ladder across all products.'
-          : 'Unified base ladder across all products.'}
+        Unified base vs adjusted stair-step ladder across all products.
       </p>
 
       <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-600">
@@ -97,16 +94,14 @@ const LadderComparisonChart = ({ rows = [], showComparison = true }) => {
               dot={renderSegmentDot}
               name={showComparison ? 'Current Ladder' : 'Base Ladder'}
             />
-            {showComparison ? (
-              <Line
-                type="stepAfter"
-                dataKey="optimizedAsp"
-                stroke="#16A34A"
-                strokeWidth={2.5}
-                dot={renderSegmentDot}
-                name="Optimized Ladder"
-              />
-            ) : null}
+            <Line
+              type="stepAfter"
+              dataKey="optimizedAsp"
+              stroke="#16A34A"
+              strokeWidth={2.5}
+              dot={renderSegmentDot}
+              name={showComparison ? 'Optimized Ladder' : 'Adjusted Ladder'}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -117,14 +112,12 @@ const LadderComparisonChart = ({ rows = [], showComparison = true }) => {
             className="inline-block h-0 w-6 border-t-[2.5px] border-[#64748B]"
             style={{ borderTopStyle: 'dashed' }}
           />
-          {showComparison ? 'Current Ladder' : 'Base Ladder'}
+          Base Ladder
         </span>
-        {showComparison ? (
-          <span className="inline-flex items-center gap-2">
-            <span className="inline-block h-0 w-6 border-t-[2.5px] border-[#16A34A]" />
-            Optimized Ladder
-          </span>
-        ) : null}
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-0 w-6 border-t-[2.5px] border-[#16A34A]" />
+          Adjusted Ladder
+        </span>
       </div>
     </div>
   )

@@ -144,7 +144,7 @@ const CurrentVsOptimizedLadderChart = ({
     <div className="panel overflow-hidden">
       <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-800">Current vs Recommended Base Ladder</h3>
+          <h3 className="text-lg font-bold text-slate-800">Adjust Price Ladder</h3>
           {selectedScenarioName ? <p className="mt-1 text-xs font-semibold text-slate-600">Scenario: {selectedScenarioName}</p> : null}
         </div>
         {onSaveScenario ? (

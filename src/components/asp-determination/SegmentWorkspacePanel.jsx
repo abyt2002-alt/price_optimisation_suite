@@ -56,6 +56,7 @@ const SegmentWorkspacePanel = ({
   onRecommendedCommit,
   onSaveScenario,
   onResetToBaseScenario,
+  onResetBasePrices,
   selectedScenarioName = '',
 }) => {
   const isBaseOnly = mode === 'base'
@@ -94,27 +95,18 @@ const SegmentWorkspacePanel = ({
     return (parseNumeric(row.optimizedRevenue, 0) / total) * 100
   }
 
+  /** Same numeric styling as base ladder table (elasticity + contribution columns). */
   const renderProductSignals = (row, segmentRecRevenue) => {
     const contributionPct = getContributionPctForSegment(row, segmentRecRevenue)
     const elasticity = parseNumeric(row.ownElasticity, -1)
 
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(140px,170px)_minmax(140px,170px)] items-center gap-2">
-        <p className="min-w-0 whitespace-normal break-words pr-1 text-[13px] font-semibold text-slate-800">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_140px_210px] items-center gap-2">
+        <p className="min-w-0 whitespace-normal break-words text-[13px] font-semibold leading-4 text-slate-800">
           {normalizeProductLabel(row.productName)}
         </p>
-        <div className="rounded border border-slate-200 bg-white px-1.5 py-1">
-          <div className="flex items-center justify-between text-[10px] font-semibold">
-            <span className="text-slate-500">E</span>
-            <span className="text-[#2563EB]">{formatElasticity(elasticity)}</span>
-          </div>
-        </div>
-        <div className="rounded border border-slate-200 bg-white px-1.5 py-1">
-          <div className="flex items-center justify-between text-[10px] font-semibold">
-            <span className="text-slate-500">Contr</span>
-            <span className="text-emerald-700">{formatPct(contributionPct)}</span>
-          </div>
-        </div>
+        <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
+        <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
       </div>
     )
   }
@@ -135,13 +127,22 @@ const SegmentWorkspacePanel = ({
     <div className="panel overflow-hidden p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-lg font-bold text-slate-800">{isBaseOnly ? 'Base Ladder' : 'Current vs Recommended Base Ladder'}</h3>
+          <h3 className="text-lg font-bold text-slate-800">Adjust Price Ladder</h3>
           {selectedScenarioName && !isBaseOnly ? (
             <p className="mt-1 text-xs font-semibold text-slate-600">Scenario: {selectedScenarioName}</p>
           ) : null}
         </div>
         {onSaveScenario ? (
           <div className="flex items-center gap-2">
+            {isBaseOnly && onResetBasePrices ? (
+              <button
+                type="button"
+                onClick={onResetBasePrices}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Reset prices
+              </button>
+            ) : null}
             {!isBaseOnly && onResetToBaseScenario ? (
               <button
                 type="button"
@@ -228,7 +229,7 @@ const SegmentWorkspacePanel = ({
                     onClick={() => onSelectSegment?.(isExpanded ? null : segment.key)}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50/80"
                     aria-expanded={isExpanded}
-                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${segment.label} SKU ladder`}
+                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${segment.label} ladder`}
                   >
                     <span className="shrink-0 text-slate-600">
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -238,30 +239,30 @@ const SegmentWorkspacePanel = ({
                       style={{ color: isExpanded ? segment.color : undefined }}
                     >
                       {segment.label}
-                      <span className="ml-2 font-semibold normal-case text-slate-500">— SKU ladder</span>
                     </span>
                   </button>
 
                   {isExpanded ? (
                     <div className="border-t border-slate-200 bg-white">
                       <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-100 px-3 py-2">
-                        <p className="text-[11px] font-semibold text-slate-500">Slider edit only: step 50, range base +/-150.</p>
+                        <p className="text-[11px] font-semibold text-slate-500">
+                          Make edits in multiples of INR 50. Maximum increase or decrease is 150 INR from each SKU&apos;s base
+                          price.
+                        </p>
                       </div>
 
                       <div className="overflow-x-auto">
                         {isBaseOnly ? (
                           <>
-                            <div className="grid min-w-[1240px] grid-cols-[minmax(0,1.6fr)_140px_210px_280px_120px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                              <span>Product</span>
-                              <span className="text-right">Elasticity</span>
-                              <span className="text-right">Contribution to Sales</span>
-                              <span className="text-right">Base price</span>
+                            <div className="grid min-w-[900px] grid-cols-[minmax(0,1.8fr)_104px_24px_184px_98px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <span>SKU</span>
+                              <span className="text-right">Current Price</span>
+                              <span className="text-center">&nbsp;</span>
+                              <span className="text-right">Adjusted</span>
                               <span className="text-right">Volume change</span>
                             </div>
                             <div className="divide-y divide-slate-100">
                               {detailRows.map((row) => {
-                                const elasticity = parseNumeric(row.ownElasticity, -1)
-                                const contributionPct = getContributionPctForSegment(row, segment.recRevenue)
                                 const currentBase = Math.round(parseNumeric(row.baseAsp, 0))
                                 const adjustedBase = getSliderValue(
                                   baseInputValues?.[row.productName] ?? row.baseAsp,
@@ -272,14 +273,24 @@ const SegmentWorkspacePanel = ({
                                 return (
                                   <div
                                     key={row.productName}
-                                    className="grid min-w-[1240px] grid-cols-[minmax(0,1.6fr)_140px_210px_280px_120px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
+                                    className="grid min-w-[900px] grid-cols-[minmax(0,1.8fr)_104px_24px_184px_98px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
                                   >
-                                    <div className="min-w-0 line-clamp-2 break-words text-[13px] font-semibold leading-4 text-slate-800">
-                                      {normalizeProductLabel(row.productName)}
+                                    <div className="min-w-0">{renderProductSignals(row, segment.recRevenue)}</div>
+
+                                    <div className="text-right">
+                                      <span className="text-[12px] font-bold text-slate-700">{formatCurrency(currentBase)}</span>
                                     </div>
-                                    <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
-                                    <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
-                                    <div className="w-full space-y-1.5">
+
+                                    <div className="text-center text-[12px] font-bold text-slate-400">{'->'}</div>
+
+                                    <div className="w-full space-y-1">
+                                      <div
+                                        className={`text-right text-[12px] font-bold ${
+                                          baseEdited ? 'text-[#2563EB]' : 'text-emerald-700'
+                                        }`}
+                                      >
+                                        {formatCurrency(adjustedBase)}
+                                      </div>
                                       <input
                                         type="range"
                                         min={getSliderBounds(row.baseAsp).min}
@@ -287,32 +298,11 @@ const SegmentWorkspacePanel = ({
                                         step={50}
                                         value={adjustedBase}
                                         onChange={(event) => handleBaseSliderChange(row, event.target.value)}
-                                        className="h-2.5 w-full cursor-pointer accent-[#2563EB]"
+                                        className="h-1.5 w-full cursor-pointer accent-[#2563EB]"
                                         aria-label={`${row.productName} base price slider`}
                                       />
-                                      {/* Current centered under the slider; adjusted on the right */}
-                                      <div className="flex w-full items-start gap-1">
-                                        <div className="min-w-0 flex-1" />
-                                        <div className="shrink-0 text-center">
-                                          <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Current</p>
-                                          <p className="text-[11px] font-bold tabular-nums leading-tight text-slate-700">
-                                            {formatCurrency(currentBase)}
-                                          </p>
-                                        </div>
-                                        <div className="flex min-w-0 flex-1 justify-end">
-                                          <div className="text-right">
-                                            <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Adjusted</p>
-                                            <p
-                                              className={`text-[11px] font-bold tabular-nums leading-tight ${
-                                                baseEdited ? 'text-[#2563EB]' : 'text-slate-800'
-                                              }`}
-                                            >
-                                              {formatCurrency(adjustedBase)}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
                                     </div>
+
                                     <div className="text-right">
                                       <span
                                         className={`inline-flex rounded-full border px-1.5 py-0.5 text-[11px] font-bold ${volumeTone(row.volumeChangePct ?? 0)}`}
@@ -327,52 +317,64 @@ const SegmentWorkspacePanel = ({
                           </>
                         ) : (
                           <>
-                            <div className="grid min-w-[900px] grid-cols-[minmax(0,1.8fr)_104px_24px_184px_98px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                              <span>Product</span>
-                              <span className="text-right">Base Price</span>
+                            <div className="grid min-w-[1240px] grid-cols-[minmax(0,1.4fr)_140px_210px_104px_24px_184px_98px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <span>SKU</span>
+                              <span className="text-right">Elasticity</span>
+                              <span className="text-right">Contribution to Sales</span>
+                              <span className="text-right">Current Price</span>
                               <span className="text-center">&nbsp;</span>
-                              <span className="text-right">Recommended</span>
-                              <span className="text-right">Volume</span>
+                              <span className="text-right">Adjusted</span>
+                              <span className="text-right">Volume change</span>
                             </div>
                             <div className="divide-y divide-slate-100">
-                              {detailRows.map((row) => (
-                                <div
-                                  key={row.productName}
-                                  className="grid min-w-[900px] grid-cols-[minmax(0,1.8fr)_104px_24px_184px_98px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
-                                >
-                                  <div className="min-w-0">{renderProductSignals(row, segment.recRevenue)}</div>
-
-                                  <div className="text-right">
-                                    <span className="text-[12px] font-bold text-slate-700">{formatCurrency(row.baseAsp)}</span>
-                                  </div>
-
-                                  <div className="text-center text-[12px] font-bold text-slate-400">{'->'}</div>
-
-                                  <div className="w-full space-y-1">
-                                    <div className="text-right text-[12px] font-bold text-emerald-700">
-                                      INR {Math.round(parseNumeric(recommendedInputValues?.[row.productName], row.optimizedAsp))}
+                              {detailRows.map((row) => {
+                                const elasticity = parseNumeric(row.ownElasticity, -1)
+                                const contributionPct = getContributionPctForSegment(row, segment.recRevenue)
+                                return (
+                                  <div
+                                    key={row.productName}
+                                    className="grid min-w-[1240px] grid-cols-[minmax(0,1.4fr)_140px_210px_104px_24px_184px_98px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
+                                  >
+                                    <div className="min-w-0 line-clamp-2 break-words text-[13px] font-semibold leading-4 text-slate-800">
+                                      {normalizeProductLabel(row.productName)}
                                     </div>
-                                    <input
-                                      type="range"
-                                      min={getSliderBounds(row.baseAsp).min}
-                                      max={getSliderBounds(row.baseAsp).max}
-                                      step={50}
-                                      value={getSliderValue(recommendedInputValues?.[row.productName] ?? row.optimizedAsp, row.baseAsp)}
-                                      onChange={(event) => handleRecommendedSliderChange(row, event.target.value)}
-                                      className="h-1.5 w-full cursor-pointer accent-[#2563EB]"
-                                      aria-label={`${row.productName} recommended price slider`}
-                                    />
-                                  </div>
+                                    <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
+                                    <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
 
-                                  <div className="text-right">
-                                    <span
-                                      className={`inline-flex rounded-full border px-1.5 py-0.5 text-[11px] font-bold ${volumeTone(row.volumeChangePct ?? 0)}`}
-                                    >
-                                      {formatSignedPct(row.volumeChangePct ?? 0)}
-                                    </span>
+                                    <div className="text-right">
+                                      <span className="text-[12px] font-bold text-slate-700">{formatCurrency(row.baseAsp)}</span>
+                                    </div>
+
+                                    <div className="text-center text-[12px] font-bold text-slate-400">{'->'}</div>
+
+                                    <div className="w-full space-y-1">
+                                      <div className="text-right text-[12px] font-bold text-emerald-700">
+                                        {formatCurrency(
+                                          Math.round(parseNumeric(recommendedInputValues?.[row.productName], row.optimizedAsp)),
+                                        )}
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={getSliderBounds(row.baseAsp).min}
+                                        max={getSliderBounds(row.baseAsp).max}
+                                        step={50}
+                                        value={getSliderValue(recommendedInputValues?.[row.productName] ?? row.optimizedAsp, row.baseAsp)}
+                                        onChange={(event) => handleRecommendedSliderChange(row, event.target.value)}
+                                        className="h-1.5 w-full cursor-pointer accent-[#2563EB]"
+                                        aria-label={`${row.productName} recommended price slider`}
+                                      />
+                                    </div>
+
+                                    <div className="text-right">
+                                      <span
+                                        className={`inline-flex rounded-full border px-1.5 py-0.5 text-[11px] font-bold ${volumeTone(row.volumeChangePct ?? 0)}`}
+                                      >
+                                        {formatSignedPct(row.volumeChangePct ?? 0)}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </>
                         )}

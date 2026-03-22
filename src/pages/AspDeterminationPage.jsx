@@ -1352,6 +1352,12 @@ const AspDeterminationPage = () => {
     ],
   )
 
+  /** Baseline-only has a single summary; a completed Run adds many scenarios. */
+  const hasOptimizationScenariosGenerated = useMemo(() => {
+    const n = optimizationResult?.scenarioSummaries?.length ?? 0
+    return n > 1
+  }, [optimizationResult])
+
   const handleScenarioPickRequest = useCallback(
     (scenarioId) => {
       if (!selectionResult?.scenarioSummaries?.length) return
@@ -1593,6 +1599,14 @@ const AspDeterminationPage = () => {
     setTimeout(() => setSaveNotice(''), 2500)
   }
 
+  const handleResetBasePrices = useCallback(() => {
+    setBasePriceEditMap({})
+    setBasePriceDraftMap({})
+    setSelectedSegment(null)
+    setRunNotice('Prices reset to base.')
+    setTimeout(() => setRunNotice(''), 2200)
+  }, [])
+
   const handleResetToBaseScenario = useCallback(() => {
     const sourceRows = activeResult?.optimizedProducts ?? []
     if (!sourceRows.length) return
@@ -1682,7 +1696,6 @@ const AspDeterminationPage = () => {
   const isBaseOnlyMode =
     (displayViewResult?.selectedScenarioId ?? activeResult?.selectedScenarioId) === 'base' &&
     (displayViewResult?.scenarioSummaries?.length ?? activeResult?.scenarioSummaries?.length ?? 0) <= 1
-  const showWorkspace = Boolean(displayViewResult) && (uiStage === 'setup' || uiStage === 'workspace' || selectionCollapsed)
 
   useEffect(() => {
     const rows = displayViewResult?.optimizedProducts ?? []
@@ -1827,7 +1840,7 @@ const AspDeterminationPage = () => {
           ) : null}
         </div>
 
-        {uiStage !== 'setup' && (
+        {hasOptimizationScenariosGenerated && (
           <div className="panel overflow-hidden">
             <div className="border-b border-slate-200">
               <button
@@ -1891,11 +1904,10 @@ const AspDeterminationPage = () => {
           </div>
         )}
 
-        {showWorkspace && displayViewResult && (
+        {displayViewResult && (
           <>
             <ImpactAndLadderPanel
               rows={displayViewResult.optimizedProducts}
-              showComparison={!isBaseOnlyMode}
               onOpenLadderModal={() => setIsLadderModalOpen(true)}
               sticky
             />
@@ -1912,6 +1924,7 @@ const AspDeterminationPage = () => {
               onRecommendedCommit={handleRecommendedCommit}
               onSaveScenario={handleSaveScenario}
               onResetToBaseScenario={handleResetToBaseScenario}
+              onResetBasePrices={handleResetBasePrices}
               selectedScenarioName={selectedScenarioName}
             />
           </>
@@ -1935,7 +1948,7 @@ const AspDeterminationPage = () => {
                   Close
                 </button>
               </div>
-              <LadderComparisonChart rows={displayViewResult.optimizedProducts} showComparison={!isBaseOnlyMode} />
+              <LadderComparisonChart rows={displayViewResult.optimizedProducts} />
             </div>
           </div>
         )}
@@ -2072,7 +2085,7 @@ const AspDeterminationPage = () => {
                   onClick={handleScenarioConfirmContinue}
                   className="rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
                 >
-                  Continue
+                  Select and Analyze
                 </button>
               </div>
             </div>
