@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { Download } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -20,15 +19,7 @@ const GROSS_MARGIN_COLOR = '#FFBD59'
 
 const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)
 const formatCurrency = (value) => `INR ${formatInt(value)}`
-const formatPct = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
 const formatShortPct = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
-const escapeCsv = (value) => {
-  const raw = String(value ?? '')
-  if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
-    return `"${raw.replaceAll('"', '""')}"`
-  }
-  return raw
-}
 
 const ScenarioLegend = () => (
   <div className="mt-2 flex items-center justify-center gap-5 text-[11px] font-semibold text-[#0F172A]">
@@ -69,59 +60,78 @@ const computeGrossMarginPct = (profit, revenue) => {
   return (profit / revenue) * 100
 }
 
-const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters }) => {
+const parseOptionalThreshold = (value) => {
+  if (value === '' || value === null || value === undefined) return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+/** Shared by OptimizationSummaryCards and AspDeterminationPage (scenario panel header). */
+export function getScenarioSelectionSummary(result, scenarioFilters) {
+  if (!result) {
+    return {
+      generatedCount: 0,
+      enrichedScenarios: [],
+      filteredScenarios: [],
+      bestByMetric: null,
+      baseGrossMarginPct: 0,
+    }
+  }
+
   const baseTotals = result.baseTotals ?? result.currentTotals
   const baseGrossMarginPct = computeGrossMarginPct(baseTotals.totalProfit, baseTotals.totalRevenue)
-  const generatedCount = Number(result.aiMetadata?.generation_counts?.final_candidates ?? result.scenarioSummaries?.length ?? 0)
+  const generatedCount = Number(
+    result.aiMetadata?.generation_counts?.final_candidates ?? result.scenarioSummaries?.length ?? 0,
+  )
 
-  const enrichedScenarios = useMemo(() => {
-    return (result.scenarioSummaries ?? []).map((scenario) => {
-      const grossMarginPct = computeGrossMarginPct(scenario.totalProfit, scenario.totalRevenue) - baseGrossMarginPct
-      return {
-        ...scenario,
-        scenarioName: scenario.scenarioName ?? `Scenario ${scenario.scenarioId}`,
-        scenarioFamily: scenario.scenarioFamily ?? 'Balanced Ladder',
-        volumePct: Number(scenario.volumeLiftPct ?? 0) * 100,
-        revenuePct: Number(scenario.revenueLiftPct ?? 0) * 100,
-        profitPct: Number(scenario.profitLiftPct ?? 0) * 100,
-        grossMarginPct,
-      }
-    })
-  }, [result.scenarioSummaries, baseGrossMarginPct])
+  const enrichedScenarios = (result.scenarioSummaries ?? []).map((scenario) => {
+    const grossMarginPct = computeGrossMarginPct(scenario.totalProfit, scenario.totalRevenue) - baseGrossMarginPct
+    return {
+      ...scenario,
+      scenarioName: scenario.scenarioName ?? `Scenario ${scenario.scenarioId}`,
+      scenarioFamily: scenario.scenarioFamily ?? 'Balanced Ladder',
+      volumePct: Number(scenario.volumeLiftPct ?? 0) * 100,
+      revenuePct: Number(scenario.revenueLiftPct ?? 0) * 100,
+      profitPct: Number(scenario.profitLiftPct ?? 0) * 100,
+      grossMarginPct,
+    }
+  })
 
-  const parseOptionalThreshold = (value) => {
-    if (value === '' || value === null || value === undefined) return null
-    const numeric = Number(value)
-    return Number.isFinite(numeric) ? numeric : null
-  }
   const minVolumeIncreasePct = parseOptionalThreshold(scenarioFilters?.minVolumeUpliftPct)
   const minRevenueIncreasePct = parseOptionalThreshold(scenarioFilters?.minRevenueUpliftPct)
   const minProfitIncreasePct = parseOptionalThreshold(scenarioFilters?.minProfitUpliftPct)
 
-  const filteredScenarios = useMemo(() => {
-    return enrichedScenarios.filter(
-      (scenario) =>
-        (minVolumeIncreasePct === null || scenario.volumePct >= minVolumeIncreasePct) &&
-        (minRevenueIncreasePct === null || scenario.revenuePct >= minRevenueIncreasePct) &&
-        (minProfitIncreasePct === null || scenario.profitPct >= minProfitIncreasePct),
-    )
-  }, [enrichedScenarios, minVolumeIncreasePct, minRevenueIncreasePct, minProfitIncreasePct])
+  const filteredScenarios = enrichedScenarios.filter(
+    (scenario) =>
+      (minVolumeIncreasePct === null || scenario.volumePct >= minVolumeIncreasePct) &&
+      (minRevenueIncreasePct === null || scenario.revenuePct >= minRevenueIncreasePct) &&
+      (minProfitIncreasePct === null || scenario.profitPct >= minProfitIncreasePct),
+  )
 
-  const bestByMetric = useMemo(() => {
-    if (!filteredScenarios.length) return null
-
-    const pickBest = (metricKey) => {
-      return [...filteredScenarios].sort(
+  let bestByMetric = null
+  if (filteredScenarios.length) {
+    const pickBest = (metricKey) =>
+      [...filteredScenarios].sort(
         (a, b) => (b[metricKey] ?? -Infinity) - (a[metricKey] ?? -Infinity) || (a.rank ?? 0) - (b.rank ?? 0),
       )[0]
-    }
 
-    return {
+    bestByMetric = {
       bestVolume: pickBest('volumePct'),
       bestRevenue: pickBest('revenuePct'),
       bestGrossMargin: pickBest('grossMarginPct'),
     }
-  }, [filteredScenarios])
+  }
+
+  return { generatedCount, enrichedScenarios, filteredScenarios, bestByMetric, baseGrossMarginPct }
+}
+
+export { formatShortPct }
+
+const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters }) => {
+  const { filteredScenarios } = useMemo(
+    () => getScenarioSelectionSummary(result, scenarioFilters),
+    [result, scenarioFilters],
+  )
 
   const chartData = useMemo(() => {
     const sortedBy = (metricKey) => {
@@ -154,100 +164,21 @@ const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters })
     }))
   }, [filteredScenarios])
 
-  const selectedRow = chartData.find((row) => row.scenarioId === result.selectedScenarioId) ?? chartData[0] ?? null
   const maxAbsPct = Math.max(
     5,
     ...chartData.map((row) => Math.max(Math.abs(row.volumePct), Math.abs(row.revenuePct), Math.abs(row.grossMarginPct))),
   )
   const yLimit = Math.ceil(maxAbsPct / 5) * 5
 
-  const handleDownloadCsv = () => {
-    const allRows = [...(result.scenarioSummaries ?? [])]
-    allRows.sort((a, b) => Number(a.scenarioId) - Number(b.scenarioId))
-
-    const baseGross = baseGrossMarginPct
-    const header = [
-      'Scenario ID',
-      'Scenario Name',
-      'Family',
-      'Total Volume',
-      'Total Revenue',
-      'Total Profit',
-      'Volume Uplift %',
-      'Revenue Uplift %',
-      'Profit Uplift %',
-      'Gross Margin %',
-      'Gross Margin % Change',
-    ]
-    const lines = [header.join(',')]
-
-    allRows.forEach((row) => {
-      const rowGross = computeGrossMarginPct(row.totalProfit, row.totalRevenue)
-      const rowValues = [
-        row.scenarioId,
-        row.scenarioName ?? `Scenario ${row.scenarioId}`,
-        row.scenarioFamily ?? 'Balanced Ladder',
-        formatInt(row.totalVolume),
-        row.totalRevenue.toFixed(2),
-        row.totalProfit.toFixed(2),
-        (Number(row.volumeLiftPct ?? 0) * 100).toFixed(4),
-        (Number(row.revenueLiftPct ?? 0) * 100).toFixed(4),
-        (Number(row.profitLiftPct ?? 0) * 100).toFixed(4),
-        rowGross.toFixed(4),
-        (rowGross - baseGross).toFixed(4),
-      ]
-      lines.push(rowValues.map(escapeCsv).join(','))
-    })
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `base_ladder_scenarios_${result.selectedMonth || 'current'}.csv`
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="panel p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-[#0F172A]">TOTAL % Comparison (Volume / Revenue / Gross Margin)</h3>
-        <button
-          type="button"
-          onClick={handleDownloadCsv}
-          className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-[#0F172A] hover:bg-slate-50"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Download CSV
-        </button>
-      </div>
-
-      <div className="mt-2 space-y-1">
-        <p className="text-[11px] font-medium text-slate-600">{generatedCount} scenarios generated!</p>
-        {bestByMetric ? (
-          <p className="text-[11px] font-medium text-slate-600">
-            Highest Volume: {formatShortPct(bestByMetric.bestVolume.volumePct)} · Highest Revenue:{' '}
-            {formatShortPct(bestByMetric.bestRevenue.revenuePct)} · Highest Gross Margin:{' '}
-            {formatShortPct(bestByMetric.bestGrossMargin.grossMarginPct)}
-          </p>
-        ) : (
-          <p className="text-[11px] font-medium text-rose-700">No scenarios match current filters.</p>
-        )}
-      </div>
+      <h3 className="text-base font-semibold text-[#0F172A]">View and compare scenarios</h3>
 
       <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
         <p className="mb-2 text-[11px] font-medium text-slate-600">
-          1) Highest volume% (positive) · 2) Highest revenue% (positive) · 3) Highest gross margin% (positive)
+          Scenarios selected to surface the highest positive volume %, revenue %, and gross margin % vs base (up to
+          three distinct scenarios). Change filters to see more.
         </p>
-
-        {selectedRow && (
-          <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-[#0F172A]">
-            Selected: {selectedRow.scenarioName} | Volume: {formatInt(selectedRow.totalVolume)} | Revenue:{' '}
-            {formatCurrency(selectedRow.totalRevenue)}
-          </div>
-        )}
 
         <div className="mt-3 h-[300px]">
           {chartData.length === 0 ? (

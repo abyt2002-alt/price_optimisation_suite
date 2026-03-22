@@ -81,25 +81,30 @@ const ImpactAndLadderPanel = ({ rows = [], showComparison = true, onOpenLadderMo
     .slice()
     .sort((a, b) => (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName))
 
+  const stickyMetricsClass = sticky
+    ? 'sticky top-2 z-20 -mx-4 border-b border-slate-200 bg-white/95 px-4 pb-4 pt-0 backdrop-blur supports-[backdrop-filter]:bg-white/80'
+    : ''
+
   return (
-    <div className={`panel p-4 ${sticky ? 'sticky top-2 z-20' : ''}`}>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[20%_80%]">
-        <div className="space-y-3">
-          <p className="text-sm font-bold uppercase tracking-wide text-slate-700">Total Impact (All Segments)</p>
-          <MetricBarCard label="Volume" baseValue={baseVolume} newValue={newVolume} />
-          <MetricBarCard label="Revenue" baseValue={baseRevenue} newValue={newRevenue} isCurrency />
-          <MetricBarCard label="Profit" baseValue={baseProfit} newValue={newProfit} isCurrency />
+    <div className="panel p-4">
+      <div className="flex flex-col gap-4">
+        <div className={`space-y-3 ${stickyMetricsClass}`}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MetricBarCard label="Volume" baseValue={baseVolume} newValue={newVolume} />
+            <MetricBarCard label="Revenue" baseValue={baseRevenue} newValue={newRevenue} isCurrency />
+            <MetricBarCard label="Profit" baseValue={baseProfit} newValue={newProfit} isCurrency />
+          </div>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-3">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-800">Full Brand Ladder (Preview)</p>
+            <p className="text-sm font-bold text-slate-800">Brand Price Ladder</p>
             <button
               type="button"
               onClick={onOpenLadderModal}
               className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Open
+              Expand
             </button>
           </div>
           <div className="h-[250px] cursor-pointer" onClick={onOpenLadderModal}>

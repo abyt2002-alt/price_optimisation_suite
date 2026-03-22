@@ -7,7 +7,10 @@ import AspScenarioFiltersPanel from '../components/asp-determination/AspScenario
 import ImpactAndLadderPanel from '../components/asp-determination/ImpactAndLadderPanel'
 import SegmentWorkspacePanel from '../components/asp-determination/SegmentWorkspacePanel'
 import LadderComparisonChart from '../components/asp-determination/LadderComparisonChart'
-import OptimizationSummaryCards from '../components/asp-determination/OptimizationSummaryCards'
+import OptimizationSummaryCards, {
+  formatShortPct,
+  getScenarioSelectionSummary,
+} from '../components/asp-determination/OptimizationSummaryCards'
 import { runAspOptimizationJob } from '../services/aspOptimizationApi'
 import { getInsightsMonths, getMonthData } from '../utils/insightsUtils'
 import { buildDisplayRows } from '../utils/aspDisplayCalculations'
@@ -700,7 +703,7 @@ const AspDeterminationPage = () => {
   const [uiStage, setUiStage] = useState('setup')
   const [generationCollapsed, setGenerationCollapsed] = useState(false)
   const [selectionCollapsed, setSelectionCollapsed] = useState(false)
-  const [selectedSegment, setSelectedSegment] = useState('daily')
+  const [selectedSegment, setSelectedSegment] = useState(null)
   const [savedScenarios, setSavedScenarios] = useState(() => readStep3SavedScenarios())
   const [savedDockOpen, setSavedDockOpen] = useState(false)
   const [isLadderModalOpen, setIsLadderModalOpen] = useState(false)
@@ -926,7 +929,7 @@ const AspDeterminationPage = () => {
     setUiStage(snapshot.uiStage ?? 'workspace')
     setGenerationCollapsed(Boolean(snapshot.generationCollapsed))
     setSelectionCollapsed(Boolean(snapshot.selectionCollapsed))
-    setSelectedSegment(snapshot.selectedSegment ?? 'daily')
+    setSelectedSegment(snapshot.selectedSegment ?? null)
     setProductConstraints(snapshot.productConstraints ?? {})
     setBasePriceEditMap(snapshot.basePriceEditMap ?? {})
     setBasePriceDraftMap({})
@@ -1077,7 +1080,7 @@ const AspDeterminationPage = () => {
           setBasePriceDraftMap({})
           setRecommendedPriceEditMap({})
           setRecommendedPriceDraftMap({})
-          setSelectedSegment('daily')
+          setSelectedSegment(null)
           setUiStage('selection')
           setGenerationCollapsed(true)
           setSelectionCollapsed(false)
@@ -1110,7 +1113,7 @@ const AspDeterminationPage = () => {
           setBasePriceDraftMap({})
           setRecommendedPriceEditMap({})
           setRecommendedPriceDraftMap({})
-          setSelectedSegment('daily')
+          setSelectedSegment(null)
           setUiStage('selection')
           setGenerationCollapsed(true)
           setSelectionCollapsed(false)
@@ -1145,7 +1148,7 @@ const AspDeterminationPage = () => {
         setBasePriceDraftMap({})
         setRecommendedPriceEditMap({})
         setRecommendedPriceDraftMap({})
-        setSelectedSegment('daily')
+        setSelectedSegment(null)
         writeCachedResult({ selectedMonth, controls, productConstraints, result: targetResult })
         return
       }
@@ -1173,7 +1176,7 @@ const AspDeterminationPage = () => {
         setBasePriceDraftMap({})
         setRecommendedPriceEditMap({})
         setRecommendedPriceDraftMap({})
-        setSelectedSegment('daily')
+        setSelectedSegment(null)
         writeCachedResult({ selectedMonth, controls, productConstraints, result: targetResult })
         animationFrameRef.current = null
       }
@@ -1331,6 +1334,23 @@ const AspDeterminationPage = () => {
       scenarioSummaries,
     }
   }, [activeResult, selectedMonth])
+
+  const scenarioPanelHeaderSummary = useMemo(
+    () =>
+      selectionResult
+        ? getScenarioSelectionSummary(selectionResult, {
+            minVolumeUpliftPct: controls.minVolumeUpliftPct,
+            minRevenueUpliftPct: controls.minRevenueUpliftPct,
+            minProfitUpliftPct: controls.minProfitUpliftPct,
+          })
+        : null,
+    [
+      selectionResult,
+      controls.minVolumeUpliftPct,
+      controls.minRevenueUpliftPct,
+      controls.minProfitUpliftPct,
+    ],
+  )
 
   const handleScenarioPickRequest = useCallback(
     (scenarioId) => {
@@ -1588,7 +1608,7 @@ const AspDeterminationPage = () => {
     setBasePriceDraftMap({})
     setRecommendedPriceEditMap(resetRecommendedMap)
     setRecommendedPriceDraftMap({})
-    setSelectedSegment('daily')
+    setSelectedSegment(null)
     setRunNotice('Reset to Base Scenario applied.')
     setTimeout(() => setRunNotice(''), 2200)
   }, [activeResult])
@@ -1667,9 +1687,10 @@ const AspDeterminationPage = () => {
   useEffect(() => {
     const rows = displayViewResult?.optimizedProducts ?? []
     if (!rows.length) return
+    if (selectedSegment == null) return
     const available = new Set(rows.map((row) => row.segmentKey ?? getSegmentKey(row.baseAsp ?? row.currentAsp)))
     if (!available.has(selectedSegment)) {
-      const nextSegment = ['daily', 'core', 'premium'].find((key) => available.has(key)) ?? 'daily'
+      const nextSegment = ['daily', 'core', 'premium'].find((key) => available.has(key)) ?? null
       setSelectedSegment(nextSegment)
     }
   }, [displayViewResult, selectedSegment])
@@ -1739,10 +1760,7 @@ const AspDeterminationPage = () => {
             className="flex w-full items-center justify-between border-b border-slate-200 px-4 py-3 text-left"
           >
             <div>
-              <h3 className="text-lg font-bold text-slate-800">AI Scenario Generation</h3>
-              <p className="mt-1 text-xs font-semibold text-[#2563EB]">
-                Generate scenarios based on your business objectives.
-              </p>
+              <h3 className="text-lg font-bold text-slate-800">Simulate pricing scenarios with TrinityAI</h3>
             </div>
             {generationCollapsed ? <ChevronRight className="h-4 w-4 text-slate-600" /> : <ChevronDown className="h-4 w-4 text-slate-600" />}
           </button>
@@ -1752,18 +1770,15 @@ const AspDeterminationPage = () => {
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
                 <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    State your business intent to simulate scenarios
+                    What is the business outcome you want to achieve?
                   </label>
                   <textarea
                     value={controls.prompt}
                     onChange={(event) => applyControlPatch({ prompt: event.target.value })}
                     rows={4}
                     className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    placeholder="Describe your business intent for scenario generation."
+                    placeholder="I want to maximize my revenue..."
                   />
-                  <p className="mt-2 text-[11px] font-medium text-slate-500">
-                    Example: protect premium margin while improving core revenue.
-                  </p>
                 </div>
               </div>
 
@@ -1773,7 +1788,6 @@ const AspDeterminationPage = () => {
                 products={monthProducts}
                 productConstraints={productConstraints}
                 onProductConstraintChange={handleProductConstraintChange}
-                onResetProductConstraints={handleResetProductConstraints}
               />
 
               <div className="grid grid-cols-2 gap-2">
@@ -1796,10 +1810,6 @@ const AspDeterminationPage = () => {
                 </button>
               </div>
 
-              <p className="text-[11px] font-medium text-slate-500">
-                Run after updating intent, margin and product bounds.
-              </p>
-
               {isRunningOptimization && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-800">
@@ -1814,37 +1824,43 @@ const AspDeterminationPage = () => {
                 </div>
               )}
             </div>
-          ) : uiStage !== 'setup' ? (
-            <div className="px-4 py-2 text-xs font-medium text-slate-600">
-              {uiStage === 'workspace' ? 'Collapsed after save. Click to expand.' : 'Collapsed after run. Click to expand.'}
-            </div>
           ) : null}
         </div>
 
         {uiStage !== 'setup' && (
           <div className="panel overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setSelectionCollapsed((prev) => !prev)}
-              className="flex w-full items-center justify-between border-b border-slate-200 px-4 py-3 text-left"
-            >
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">Scenario Selection</h3>
-                <p className="mt-1 text-xs font-medium text-slate-600">Select a scenario from total comparison chart.</p>
-              </div>
-              {selectionCollapsed ? <ChevronRight className="h-4 w-4 text-slate-600" /> : <ChevronDown className="h-4 w-4 text-slate-600" />}
-            </button>
+            <div className="border-b border-slate-200">
+              <button
+                type="button"
+                onClick={() => setSelectionCollapsed((prev) => !prev)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Select scenarios for further analysis</h3>
+                </div>
+                {selectionCollapsed ? <ChevronRight className="h-4 w-4 text-slate-600" /> : <ChevronDown className="h-4 w-4 text-slate-600" />}
+              </button>
+              {!selectionCollapsed && scenarioPanelHeaderSummary ? (
+                <div className="space-y-1.5 px-4 pb-4">
+                  <p className="text-sm font-semibold text-slate-800">
+                    {scenarioPanelHeaderSummary.generatedCount} scenarios generated!
+                  </p>
+                  {scenarioPanelHeaderSummary.bestByMetric ? (
+                    <p className="text-xs font-medium text-slate-600">
+                      Highest Volume: {formatShortPct(scenarioPanelHeaderSummary.bestByMetric.bestVolume.volumePct)} ·
+                      Highest Revenue: {formatShortPct(scenarioPanelHeaderSummary.bestByMetric.bestRevenue.revenuePct)} ·
+                      Highest Gross Margin:{' '}
+                      {formatShortPct(scenarioPanelHeaderSummary.bestByMetric.bestGrossMargin.grossMarginPct)}
+                    </p>
+                  ) : (
+                    <p className="text-xs font-medium text-rose-700">No scenarios match current filters.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
 
             {!selectionCollapsed ? (
               <div className="space-y-4 p-4">
-                <AspScenarioFiltersPanel
-                  controls={controls}
-                  onControlsChange={applyControlPatch}
-                  products={monthProducts}
-                  productConstraints={productConstraints}
-                  onProductConstraintChange={handleProductConstraintChange}
-                  onResetProductConstraints={handleResetProductConstraints}
-                />
                 {selectionResult ? (
                   <OptimizationSummaryCards
                     result={selectionResult}
@@ -1856,10 +1872,16 @@ const AspDeterminationPage = () => {
                     }}
                   />
                 ) : null}
+                <AspScenarioFiltersPanel
+                  controls={controls}
+                  onControlsChange={applyControlPatch}
+                  products={monthProducts}
+                  productConstraints={productConstraints}
+                  onProductConstraintChange={handleProductConstraintChange}
+                  onResetProductConstraints={handleResetProductConstraints}
+                />
               </div>
-            ) : (
-              <div className="px-4 py-2 text-xs font-medium text-slate-600">Selection collapsed. Click to expand.</div>
-            )}
+            ) : null}
           </div>
         )}
 
