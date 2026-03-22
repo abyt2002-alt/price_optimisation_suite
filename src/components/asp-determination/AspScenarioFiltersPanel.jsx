@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 
+const normalizeSkuLabel = (value) =>
+  String(value ?? '')
+    .replace(/\|/g, ' | ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const FILTER_SKU_TABLE_GRID = 'grid grid-cols-[minmax(220px,1.5fr)_minmax(78px,92px)_84px_84px_84px] gap-2'
+
 const NumberInput = ({ label, value, onChange, min = -100, max = 500, step = 1, suffix = '%' }) => {
   return (
     <div className="space-y-1">
@@ -41,17 +49,21 @@ const ProductFilterTable = ({
   onProductConstraintChange,
 }) => {
   return (
-    <div className="mt-2 rounded-lg border border-slate-200 bg-white">
-      <div className="grid grid-cols-[minmax(0,2fr)_78px_84px_84px_84px] gap-2 border-b border-slate-200 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        <span>Product</span>
-        <span className="text-right">Base</span>
-        <span className="text-center">No Chg</span>
-        <span className="text-right">Min</span>
-        <span className="text-right">Max</span>
-      </div>
-      <div className="max-h-[280px] divide-y divide-slate-100 overflow-auto">
+    <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="min-w-[548px] max-h-[280px] overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
+        <div
+          className={`${FILTER_SKU_TABLE_GRID} sticky top-0 z-10 border-b border-slate-200 bg-white px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500`}
+        >
+          <span>SKU</span>
+          <span className="text-right leading-tight">Base Price</span>
+          <span className="text-center">No Chg</span>
+          <span className="text-right">Min</span>
+          <span className="text-right">Max</span>
+        </div>
+        <div className="divide-y divide-slate-100">
         {products.map((item) => {
           const key = item.productName
+          const displaySku = normalizeSkuLabel(item.productName ?? item.skuName ?? item.product_name)
           const c = productConstraints[key] ?? {}
           const minAllowed = Math.max(1, item.basePrice - 150)
           const maxAllowed = item.basePrice + 150
@@ -60,8 +72,10 @@ const ProductFilterTable = ({
           const maxPrice = Number.isFinite(c.maxPrice) ? clamp(c.maxPrice, minAllowed, maxAllowed) : maxAllowed
 
           return (
-            <div key={key} className="grid grid-cols-[minmax(0,2fr)_78px_84px_84px_84px] items-center gap-2 px-2 py-1.5">
-              <span className="line-clamp-2 break-words text-[12px] font-medium leading-4 text-slate-800">{item.productName}</span>
+            <div key={key} className={`${FILTER_SKU_TABLE_GRID} items-start gap-2 px-2 py-1.5`}>
+              <span className="min-w-0 whitespace-normal break-words text-[12px] font-medium leading-snug text-slate-800" title={displaySku}>
+                {displaySku}
+              </span>
               <span className="text-right text-[12px] font-semibold text-slate-700">{Math.round(item.basePrice)}</span>
               <label className="inline-flex items-center justify-center">
                 <input
@@ -113,6 +127,7 @@ const ProductFilterTable = ({
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )
@@ -165,7 +180,7 @@ const AspScenarioFiltersPanel = ({
 
   return (
     <div className="panel p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Scenario Filters (Min % vs Base)</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Filter scenarios</p>
       <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
         <NumberInput
           label="Min Volume % Increase"
@@ -199,7 +214,7 @@ const AspScenarioFiltersPanel = ({
           onClick={() => setIsProductFilterOpen((prev) => !prev)}
           className="flex w-full items-center justify-between text-left text-xs font-semibold text-slate-700"
         >
-          <span>Product-level Query & Filter</span>
+          <span>SKU-level filters</span>
           <span>{isProductFilterOpen ? '▾' : '▸'}</span>
         </button>
 
@@ -215,17 +230,10 @@ const AspScenarioFiltersPanel = ({
               />
               <button
                 type="button"
-                onClick={() => setQuery('')}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Clear Query
-              </button>
-              <button
-                type="button"
                 onClick={onResetProductConstraints}
                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
-                Reset SKU Bounds
+                Reset
               </button>
             </div>
             <ProductFilterTable

@@ -1,18 +1,33 @@
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 
+const normalizeSkuLabel = (value) =>
+  String(value ?? '')
+    .replace(/\|/g, ' | ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+// Min width on SKU column so names stay readable inside narrow segment cards (minmax(0,fr) can collapse to 0).
+const SKU_TABLE_GRID = 'grid grid-cols-[minmax(220px,1.5fr)_84px_88px_84px_84px] gap-2'
+
 const SegmentProductTable = ({ products, productConstraints, onProductConstraintChange }) => {
+  // Single overflow container + inner pr avoids vertical scrollbar overlapping the Max column
+  // inside narrow <details> panels (nested overflow-x + overflow-y made the bar paint over inputs).
   return (
-    <div className="mt-2 rounded-lg border border-slate-200 bg-white">
-      <div className="grid grid-cols-[minmax(0,2fr)_84px_88px_84px_84px] gap-2 border-b border-slate-200 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        <span>Product</span>
-        <span className="text-right">Base</span>
-        <span className="text-center">No Change</span>
-        <span className="text-right">Min</span>
-        <span className="text-right">Max</span>
-      </div>
-      <div className="max-h-[252px] divide-y divide-slate-100 overflow-auto">
+    <div className="mt-2 max-h-[252px] min-w-0 overflow-auto rounded-lg border border-slate-200 bg-white [scrollbar-gutter:stable]">
+      <div className="min-w-[560px] pr-3">
+        <div
+          className={`${SKU_TABLE_GRID} sticky top-0 z-10 border-b border-slate-200 bg-white px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500`}
+        >
+          <span>SKU</span>
+          <span className="text-right">Base</span>
+          <span className="text-center leading-tight">Do not change</span>
+          <span className="text-right">Min</span>
+          <span className="text-right">Max</span>
+        </div>
+        <div className="divide-y divide-slate-100">
         {products.map((item) => {
           const key = item.productName
+          const displaySku = normalizeSkuLabel(item.productName ?? item.skuName ?? item.product_name)
           const c = productConstraints[key] ?? {}
           const minAllowed = Math.max(1, item.basePrice - 150)
           const maxAllowed = item.basePrice + 150
@@ -20,8 +35,13 @@ const SegmentProductTable = ({ products, productConstraints, onProductConstraint
           const minPrice = Number.isFinite(c.minPrice) ? clamp(c.minPrice, minAllowed, maxAllowed) : minAllowed
           const maxPrice = Number.isFinite(c.maxPrice) ? clamp(c.maxPrice, minAllowed, maxAllowed) : maxAllowed
           return (
-            <div key={key} className="grid grid-cols-[minmax(0,2fr)_84px_88px_84px_84px] items-center gap-2 px-2 py-1.5">
-              <span className="line-clamp-2 break-words text-[12px] font-medium leading-4 text-slate-800">{item.productName}</span>
+            <div key={key} className={`${SKU_TABLE_GRID} items-start px-2 py-1.5`}>
+              <span
+                className="min-w-0 whitespace-normal break-words text-[12px] font-medium leading-snug text-slate-800"
+                title={displaySku}
+              >
+                {displaySku}
+              </span>
               <span className="text-right text-[12px] font-semibold text-slate-700">{Math.round(item.basePrice)}</span>
               <label className="inline-flex items-center justify-center">
                 <input
@@ -73,6 +93,7 @@ const SegmentProductTable = ({ products, productConstraints, onProductConstraint
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )
@@ -90,7 +111,7 @@ const SegmentColumn = ({
   onProductConstraintChange,
 }) => {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-800">{title}</p>
@@ -103,7 +124,7 @@ const SegmentColumn = ({
             onChange={(event) => onNoChangeChange?.(event.target.checked)}
             className="h-3.5 w-3.5 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
           />
-          No Change
+          Do not change
         </label>
       </div>
 
@@ -136,7 +157,7 @@ const SegmentColumn = ({
         </div>
       </div>
 
-      <details className="mt-3 rounded-lg border border-slate-200 bg-white p-2">
+      <details className="mt-3 min-w-0 rounded-lg border border-slate-200 bg-white p-2">
         <summary className="cursor-pointer text-xs font-semibold text-slate-700">
           SKU-level override (optional)
         </summary>
@@ -156,7 +177,6 @@ const AspInputGuardrailsPanel = ({
   products = [],
   productConstraints = {},
   onProductConstraintChange,
-  onResetProductConstraints,
 }) => {
   const dailyProducts = products.filter((item) => item.segmentKey === 'daily')
   const coreProducts = products.filter((item) => item.segmentKey === 'core')
@@ -164,22 +184,12 @@ const AspInputGuardrailsPanel = ({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-bold text-slate-800">Set constraints</h3>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">Set segment limits first, then optional SKU overrides.</p>
-        </div>
-        <button
-          type="button"
-          onClick={onResetProductConstraints}
-          className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Reset Product Bounds
-        </button>
+      <div>
+        <h3 className="text-base font-bold text-slate-800">Set constraints</h3>
       </div>
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Minimum Gross Margin</label>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Set the minimum gross margin</label>
         <div className="relative mt-1.5">
           <input
             type="number"
