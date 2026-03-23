@@ -69,13 +69,13 @@ const ElasticitySummaryCards = ({
   const effectiveElasticity = currentPointElasticity ?? ownElasticity
   const absElasticity = Math.abs(effectiveElasticity)
 
-  let recommendation = 'Hold Price'
+  let recommendation = 'Hold Base Price'
   let recommendationClass = 'border-emerald-200 bg-emerald-50 text-emerald-800'
   if (absElasticity > 1.1) {
-    recommendation = 'Price Reduction Recommended'
+    recommendation = 'Reduce Base Price'
     recommendationClass = 'border-rose-200 bg-rose-50 text-rose-800'
   } else if (absElasticity < 0.9) {
-    recommendation = 'Price Increase Opportunity'
+    recommendation = 'Increase Base Price'
     recommendationClass = 'border-blue-200 bg-blue-50 text-blue-800'
   }
 
@@ -89,18 +89,17 @@ const ElasticitySummaryCards = ({
           </span>
         </div>
         <div className="pt-1 text-center">
-          <h3 className="text-xl font-bold text-slate-800">Product Summary</h3>
-          <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{shortProductName}</p>
+          <h3 className="text-xl font-bold text-slate-800">{shortProductName}</h3>
         </div>
         <div className="justify-self-end rounded-lg border border-slate-200 bg-white px-3 py-2 text-right">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Own Price Elasticity</p>
-          <p className="text-2xl font-extrabold text-slate-900">{effectiveElasticity.toFixed(3)}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Price Elasticity</p>
+          <p className="text-2xl font-extrabold text-slate-900">{effectiveElasticity.toFixed(2)}</p>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
         <MetricCard
-          label="Current Price"
+          label="Current Price (Average Selling Price)"
           value={`INR ${formatCurrency(anchorRow.currentPrice)}`}
           icon={BadgeIndianRupee}
         />
@@ -118,13 +117,13 @@ const ElasticitySummaryCards = ({
           icon={Gauge}
         />
         <MetricCard
-          label="Volume @ Revenue-Max Price"
+          label="Volume @ New Price"
           value={formatCurrency(volumeAtRevenueMax)}
           delta={`${formatPct(volumeDeltaPct)} vs current`}
           icon={TrendingUp}
         />
         <MetricCard
-          label="Potential Max Revenue"
+          label="Revenue @ New Price"
           value={`INR ${formatCurrency(revenueMax)}`}
           delta={`${formatPct(revenueUpliftPct)} vs current`}
           tone={revenueUpliftPct >= 0 ? 'success' : 'danger'}

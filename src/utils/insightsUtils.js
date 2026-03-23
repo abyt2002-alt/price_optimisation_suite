@@ -68,12 +68,49 @@ export const formatYearMonthLabel = (yearMonth) => {
 }
 
 export const getProductOptions = (yearMonth) => {
-  const rows = ownBrandMonthlyData.filter((row) => row.yearMonth === yearMonth)
-  return rows.sort((a, b) => a.basePrice - b.basePrice).map((row) => row.productName)
+  const rows = yearMonth
+    ? ownBrandMonthlyData.filter((row) => row.yearMonth === yearMonth)
+    : ownBrandMonthlyData
+  return [...new Set(rows.sort((a, b) => a.basePrice - b.basePrice).map((row) => row.productName))]
 }
 
 export const getMonthData = (yearMonth) => {
   return ownBrandMonthlyData.filter((row) => row.yearMonth === yearMonth)
+}
+
+export const getAveragedPeriodData = () => {
+  const byProduct = new Map()
+  ownBrandMonthlyData.forEach((row) => {
+    const key = String(row.productName)
+    const current = byProduct.get(key) ?? {
+      productName: key,
+      basePriceSum: 0,
+      currentPriceSum: 0,
+      volumeSum: 0,
+      distributionSum: 0,
+      rpiEffectSum: 0,
+      count: 0,
+    }
+    current.basePriceSum += Number(row.basePrice ?? 0)
+    current.currentPriceSum += Number(row.currentPrice ?? 0)
+    current.volumeSum += Number(row.volume ?? 0)
+    current.distributionSum += Number(row.distribution ?? 0)
+    current.rpiEffectSum += Number(row.rpiEffect ?? 0)
+    current.count += 1
+    byProduct.set(key, current)
+  })
+
+  return [...byProduct.values()]
+    .map((item) => ({
+      yearMonth: 'ALL_PERIOD',
+      productName: item.productName,
+      basePrice: item.count ? item.basePriceSum / item.count : 0,
+      currentPrice: item.count ? item.currentPriceSum / item.count : 0,
+      volume: item.count ? item.volumeSum / item.count : 0,
+      distribution: item.count ? item.distributionSum / item.count : 0,
+      rpiEffect: item.count ? item.rpiEffectSum / item.count : 0,
+    }))
+    .sort((a, b) => a.basePrice - b.basePrice || a.productName.localeCompare(b.productName))
 }
 
 const getProductIndex = (productName, monthRows) => {
@@ -253,12 +290,11 @@ export const getCrossElasticityRow = (matrix, productName) => {
 export const formatCurrency = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)
 
 export const buildInsightsPayload = ({
-  yearMonth,
   productName,
   curveRange = 'standard',
   sensitivity = 'base',
 }) => {
-  const monthRows = getMonthData(yearMonth)
+  const monthRows = getAveragedPeriodData()
   const anchorRow = monthRows.find((row) => row.productName === productName) || monthRows[0]
 
   const ownElasticity = computeOwnElasticity(anchorRow.productName, monthRows, sensitivity)
@@ -349,6 +385,13 @@ export const buildPortfolioElasticityBands = (monthRows, sensitivity = 'base') =
     const currentElasticity = computeOwnElasticity(row.productName, monthRows, sensitivity)
     const band = getElasticityBand(currentElasticity)
     const stats = avgStats.get(row.productName)
+    const demandCurve = buildDemandCurve({
+      anchorRow: row,
+      ownElasticity: currentElasticity,
+      curveRange: 'standard',
+    })
+    const revenueCurve = buildRevenueCurve(demandCurve)
+    const recommendedPrice = revenueCurve.maxRevenuePoint?.price ?? row.currentPrice
 
     const suggestedAction =
       band === 'reduce'
@@ -364,6 +407,7 @@ export const buildPortfolioElasticityBands = (monthRows, sensitivity = 'base') =
       avgElasticity: stats?.avgElasticity ?? currentElasticity,
       avgAsp: stats?.avgAsp ?? row.currentPrice,
       currentAsp: row.currentPrice,
+      recommendedPrice,
       basePrice: row.basePrice,
       suggestedAction,
       band,
