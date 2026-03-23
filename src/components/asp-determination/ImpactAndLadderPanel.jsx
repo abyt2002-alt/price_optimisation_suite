@@ -50,14 +50,14 @@ const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false }) => {
   )
 }
 
-const LadderTooltip = ({ active, payload, showComparison }) => {
+const LadderTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
   const point = payload[0].payload
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
       <p className="text-xs font-semibold text-slate-800">{point.productName}</p>
       <p className="text-[11px] text-slate-600">Base: {formatCurrency(point.baseAsp)}</p>
-      {showComparison ? <p className="text-[11px] text-slate-600">Recommended: {formatCurrency(point.optimizedAsp)}</p> : null}
+      <p className="text-[11px] text-slate-600">Adjusted: {formatCurrency(point.optimizedAsp)}</p>
     </div>
   )
 }
@@ -69,7 +69,7 @@ const renderSegmentDot = (props) => {
   return <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#ffffff" strokeWidth={1.2} />
 }
 
-const ImpactAndLadderPanel = ({ rows = [], showComparison = true, onOpenLadderModal, sticky = false }) => {
+const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) => {
   const baseVolume = rows.reduce((sum, row) => sum + (row.currentVolume ?? 0), 0)
   const newVolume = rows.reduce((sum, row) => sum + (row.optimizedVolume ?? 0), 0)
   const baseRevenue = rows.reduce((sum, row) => sum + (row.currentRevenue ?? 0), 0)
@@ -79,7 +79,10 @@ const ImpactAndLadderPanel = ({ rows = [], showComparison = true, onOpenLadderMo
 
   const ladderRows = rows
     .slice()
-    .sort((a, b) => (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName))
+    .sort(
+      (a, b) =>
+        (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName),
+    )
 
   const stickyMetricsClass = sticky
     ? 'sticky top-2 z-20 -mx-4 border-b border-slate-200 bg-white/95 px-4 pb-4 pt-0 backdrop-blur supports-[backdrop-filter]:bg-white/80'
@@ -113,7 +116,7 @@ const ImpactAndLadderPanel = ({ rows = [], showComparison = true, onOpenLadderMo
                 <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
                 <XAxis dataKey="productName" tick={{ fontSize: 9 }} interval={0} angle={-18} textAnchor="end" height={68} />
                 <YAxis tick={{ fontSize: 10, fontWeight: 600 }} />
-                <Tooltip content={<LadderTooltip showComparison={showComparison} />} />
+                <Tooltip content={<LadderTooltip />} />
                 <Line
                   type="stepAfter"
                   dataKey="baseAsp"
@@ -122,9 +125,7 @@ const ImpactAndLadderPanel = ({ rows = [], showComparison = true, onOpenLadderMo
                   strokeDasharray="5 4"
                   dot={renderSegmentDot}
                 />
-                {showComparison ? (
-                  <Line type="stepAfter" dataKey="optimizedAsp" stroke="#16A34A" strokeWidth={2.2} dot={renderSegmentDot} />
-                ) : null}
+                <Line type="stepAfter" dataKey="optimizedAsp" stroke="#16A34A" strokeWidth={2.2} dot={renderSegmentDot} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
