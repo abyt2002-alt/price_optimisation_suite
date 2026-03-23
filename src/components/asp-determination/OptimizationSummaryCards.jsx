@@ -45,12 +45,6 @@ const ScenarioTooltip = ({ active, payload }) => {
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <p className="text-sm font-semibold text-[#0F172A]">{row.scenarioName}</p>
       <p className="text-xs text-slate-600">Family: {row.scenarioFamily}</p>
-      <p className="mt-1 text-xs text-slate-600">Volume: {formatInt(row.totalVolume)}</p>
-      <p className="text-xs text-slate-600">Revenue: {formatCurrency(row.totalRevenue)}</p>
-      <p className="text-xs text-slate-600">Profit: {formatCurrency(row.totalProfit)}</p>
-      <p className="mt-1 text-xs text-slate-600">Volume %: {formatShortPct(row.volumePct)}</p>
-      <p className="text-xs text-slate-600">Revenue %: {formatShortPct(row.revenuePct)}</p>
-      <p className="text-xs text-slate-600">Gross Margin %: {formatShortPct(row.grossMarginPct)}</p>
     </div>
   )
 }
@@ -64,6 +58,38 @@ const parseOptionalThreshold = (value) => {
   if (value === '' || value === null || value === undefined) return null
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : null
+}
+
+const isScenarioWithinSkuConstraints = (result, scenarioId, productConstraints = {}) => {
+  const detailRows = result?.scenarioDetails?.[scenarioId]?.optimizedProducts
+  if (!Array.isArray(detailRows) || !detailRows.length) return true
+
+  const rowByProduct = new Map(detailRows.map((row) => [String(row.productName ?? ''), row]))
+  const constrainedEntries = Object.entries(productConstraints ?? {}).filter(([, item]) => item && typeof item === 'object')
+  if (!constrainedEntries.length) return true
+
+  return constrainedEntries.every(([productName, item]) => {
+    const row = rowByProduct.get(String(productName))
+    if (!row) return true
+
+    const baseAsp = Number(row.baseAsp ?? row.currentAsp ?? 0)
+    const optimizedAsp = Number(row.optimizedAsp ?? row.currentAsp ?? baseAsp)
+    if (!Number.isFinite(baseAsp) || !Number.isFinite(optimizedAsp)) return true
+
+    if (Boolean(item.noChange)) {
+      return Math.abs(optimizedAsp - baseAsp) <= 0.5
+    }
+
+    const minPrice = Number(item.minPrice)
+    const maxPrice = Number(item.maxPrice)
+    const hasMin = Number.isFinite(minPrice)
+    const hasMax = Number.isFinite(maxPrice)
+    if (!hasMin && !hasMax) return true
+
+    const lower = hasMin ? minPrice : -Infinity
+    const upper = hasMax ? maxPrice : Infinity
+    return optimizedAsp >= lower - 0.5 && optimizedAsp <= upper + 0.5
+  })
 }
 
 /** Shared by OptimizationSummaryCards and AspDeterminationPage (scenario panel header). */
@@ -99,13 +125,15 @@ export function getScenarioSelectionSummary(result, scenarioFilters) {
 
   const minVolumeIncreasePct = parseOptionalThreshold(scenarioFilters?.minVolumeUpliftPct)
   const minRevenueIncreasePct = parseOptionalThreshold(scenarioFilters?.minRevenueUpliftPct)
-  const minProfitIncreasePct = parseOptionalThreshold(scenarioFilters?.minProfitUpliftPct)
+  const minGrossMarginIncreasePct = parseOptionalThreshold(scenarioFilters?.minProfitUpliftPct)
+  const skuConstraints = scenarioFilters?.productConstraints ?? {}
 
   const filteredScenarios = enrichedScenarios.filter(
     (scenario) =>
       (minVolumeIncreasePct === null || scenario.volumePct >= minVolumeIncreasePct) &&
       (minRevenueIncreasePct === null || scenario.revenuePct >= minRevenueIncreasePct) &&
-      (minProfitIncreasePct === null || scenario.profitPct >= minProfitIncreasePct),
+      (minGrossMarginIncreasePct === null || scenario.grossMarginPct >= minGrossMarginIncreasePct) &&
+      isScenarioWithinSkuConstraints(result, scenario.scenarioId, skuConstraints),
   )
 
   let bestByMetric = null

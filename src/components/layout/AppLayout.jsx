@@ -12,9 +12,9 @@ import { useState } from 'react'
 
 const navigation = [
   { name: 'Home', href: '/', icon: Home },
-  { name: 'Brand Ladder', href: '/portfolio?step=1', icon: BarChart3, step: '1' },
-  { name: 'Insights', href: '/portfolio?step=2', icon: SlidersHorizontal, step: '2' },
-  { name: 'Base Ladder Detection', href: '/portfolio?step=3', icon: LineChart, step: '3' },
+  { name: 'Review Brand Price Ladder', href: '/portfolio?step=1', icon: BarChart3, step: '1' },
+  { name: 'Key Business Insights', href: '/portfolio?step=2', icon: SlidersHorizontal, step: '2' },
+  { name: 'Optimize Price Ladder', href: '/portfolio?step=3', icon: LineChart, step: '3' },
 ]
 
 const AppLayout = ({ children, rightSidebar }) => {

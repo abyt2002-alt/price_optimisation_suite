@@ -84,7 +84,7 @@ const LadderComparisonChart = ({ rows = [] }) => {
             <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
             <XAxis dataKey="productName" tick={{ fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={72} />
             <YAxis tick={{ fontSize: 11, fontWeight: 600 }} />
-            <Tooltip content={<ComparisonTooltip showComparison={showComparison} />} />
+            <Tooltip content={<ComparisonTooltip />} />
             <Line
               type="stepAfter"
               dataKey="baseAsp"
@@ -92,7 +92,7 @@ const LadderComparisonChart = ({ rows = [] }) => {
               strokeWidth={2.2}
               strokeDasharray="5 4"
               dot={renderSegmentDot}
-              name={showComparison ? 'Current Ladder' : 'Base Ladder'}
+              name="Base Ladder"
             />
             <Line
               type="stepAfter"
@@ -100,7 +100,7 @@ const LadderComparisonChart = ({ rows = [] }) => {
               stroke="#16A34A"
               strokeWidth={2.5}
               dot={renderSegmentDot}
-              name={showComparison ? 'Optimized Ladder' : 'Adjusted Ladder'}
+              name="Adjusted Ladder"
             />
           </ComposedChart>
         </ResponsiveContainer>

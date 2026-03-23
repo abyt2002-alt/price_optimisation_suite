@@ -9,25 +9,26 @@ import {
 } from 'recharts'
 
 const SEGMENT_COLORS = {
-  daily: '#2563EB',
-  core: '#F97316',
+  daily: '#1D4ED8',
+  core: '#EA580C',
   premium: '#16A34A',
 }
 
 const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value))
 const formatCurrency = (value) => `INR ${formatInt(value)}`
+const formatPct = (value) => `${Number(value).toFixed(1)}%`
 const formatSignedPct = (value) => {
   const pct = Number(value) * 100
   const sign = pct >= 0 ? '+' : ''
   return `${sign}${pct.toFixed(1)}%`
 }
 
-const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false }) => {
-  const deltaPct = baseValue === 0 ? 0 : (newValue - baseValue) / baseValue
+const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false, isRate = false }) => {
+  const deltaPct = isRate ? (newValue - baseValue) / 100 : baseValue === 0 ? 0 : (newValue - baseValue) / baseValue
   const isPositive = deltaPct >= 0
   const width = Math.min(100, Math.abs(deltaPct * 100))
-  const fromText = isCurrency ? formatCurrency(baseValue) : formatInt(baseValue)
-  const toText = isCurrency ? formatCurrency(newValue) : formatInt(newValue)
+  const fromText = isRate ? formatPct(baseValue) : isCurrency ? formatCurrency(baseValue) : formatInt(baseValue)
+  const toText = isRate ? formatPct(newValue) : isCurrency ? formatCurrency(newValue) : formatInt(newValue)
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -66,7 +67,7 @@ const renderSegmentDot = (props) => {
   const { cx, cy, payload } = props
   if (cx === undefined || cy === undefined || !payload) return null
   const color = SEGMENT_COLORS[payload.segmentKey] ?? '#64748B'
-  return <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#ffffff" strokeWidth={1.2} />
+  return <circle cx={cx} cy={cy} r={4.5} fill={color} stroke="#ffffff" strokeWidth={1.6} />
 }
 
 const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) => {
@@ -76,6 +77,8 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
   const newRevenue = rows.reduce((sum, row) => sum + (row.optimizedRevenue ?? 0), 0)
   const baseProfit = rows.reduce((sum, row) => sum + (row.currentProfit ?? 0), 0)
   const newProfit = rows.reduce((sum, row) => sum + (row.optimizedProfit ?? 0), 0)
+  const baseGrossMargin = baseRevenue === 0 ? 0 : (baseProfit / baseRevenue) * 100
+  const newGrossMargin = newRevenue === 0 ? 0 : (newProfit / newRevenue) * 100
 
   const ladderRows = rows
     .slice()
@@ -91,12 +94,17 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
   return (
     <div className="panel p-4">
       <div className="flex flex-col gap-4">
+        <h3 className="text-base font-bold text-slate-800">Current Price Ladder and Projected Business Impact</h3>
         <div className={`space-y-3 ${stickyMetricsClass}`}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricBarCard label="Volume" baseValue={baseVolume} newValue={newVolume} />
             <MetricBarCard label="Revenue" baseValue={baseRevenue} newValue={newRevenue} isCurrency />
-            <MetricBarCard label="Profit" baseValue={baseProfit} newValue={newProfit} isCurrency />
+            <MetricBarCard label="Gross Margin" baseValue={baseGrossMargin} newValue={newGrossMargin} isRate />
           </div>
+          <p className="text-[10px] font-medium leading-snug text-slate-500">
+            Projections reflect both a baseline forecast and the impact of price adjustments. Growth rates are Y-o-Y
+            comparison with the same season.
+          </p>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -110,6 +118,28 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
               Expand
             </button>
           </div>
+          <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-700">
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-0 w-6 border-t-[3px] border-[#475569]" style={{ borderTopStyle: 'dashed' }} />
+              Base Ladder
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-0 w-6 border-t-[3px] border-[#0F766E]" />
+              Adjusted Ladder
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#1D4ED8]" />
+              Daily Casual
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#EA580C]" />
+              Core Plus
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
+              Premium
+            </span>
+          </div>
           <div className="h-[250px] cursor-pointer" onClick={onOpenLadderModal}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={ladderRows} margin={{ top: 8, right: 8, left: 0, bottom: 18 }}>
@@ -120,12 +150,12 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
                 <Line
                   type="stepAfter"
                   dataKey="baseAsp"
-                  stroke="#64748B"
-                  strokeWidth={2}
+                  stroke="#475569"
+                  strokeWidth={2.8}
                   strokeDasharray="5 4"
                   dot={renderSegmentDot}
                 />
-                <Line type="stepAfter" dataKey="optimizedAsp" stroke="#16A34A" strokeWidth={2.2} dot={renderSegmentDot} />
+                <Line type="stepAfter" dataKey="optimizedAsp" stroke="#0F766E" strokeWidth={3} dot={renderSegmentDot} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
