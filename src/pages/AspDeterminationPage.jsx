@@ -74,6 +74,12 @@ const normalizeProductLabel = (value) =>
     .replace(/\|/g, ' | ')
     .replace(/\s+/g, ' ')
     .trim()
+const computeGrossMarginPct = (profit, revenue) => {
+  const p = Number(profit)
+  const r = Number(revenue)
+  if (!Number.isFinite(p) || !Number.isFinite(r) || r === 0) return 0
+  return (p / r) * 100
+}
 const groupScenarioRowsBySegment = (rows = []) =>
   SEGMENT_ORDER.map((segmentKey) => ({
     segmentKey,
@@ -173,29 +179,29 @@ const downloadSavedScenariosWorkbook = (savedScenarios) => {
     .map((scenario, index) => {
       const sheetName = safeSheetName(scenario.name, index)
       const baseRevenue = Number(scenario.baseTotals?.totalRevenue ?? 0)
-      const recommendedRevenue = Number(scenario.optimizedTotals?.totalRevenue ?? 0)
+      const newRevenue = Number(scenario.optimizedTotals?.totalRevenue ?? 0)
       const baseVolume = Number(scenario.baseTotals?.totalVolume ?? 0)
-      const recommendedVolume = Number(scenario.optimizedTotals?.totalVolume ?? 0)
+      const newVolume = Number(scenario.optimizedTotals?.totalVolume ?? 0)
       const baseProfit = Number(scenario.baseTotals?.totalProfit ?? 0)
-      const recommendedProfit = Number(scenario.optimizedTotals?.totalProfit ?? 0)
-      const volumeUpliftPct = baseVolume === 0 ? 0 : ((recommendedVolume - baseVolume) / baseVolume) * 100
-      const revenueUpliftPct = baseRevenue === 0 ? 0 : ((recommendedRevenue - baseRevenue) / baseRevenue) * 100
-      const profitUpliftPct = baseProfit === 0 ? 0 : ((recommendedProfit - baseProfit) / baseProfit) * 100
+      const newProfit = Number(scenario.optimizedTotals?.totalProfit ?? 0)
+      const volumeChangePct = baseVolume === 0 ? 0 : ((newVolume - baseVolume) / baseVolume) * 100
+      const revenueChangePct = baseRevenue === 0 ? 0 : ((newRevenue - baseRevenue) / baseRevenue) * 100
+      const baseGrossMarginPct = baseRevenue === 0 ? 0 : (baseProfit / baseRevenue) * 100
+      const newGrossMarginPct = newRevenue === 0 ? 0 : (newProfit / newRevenue) * 100
+      const grossMarginChangePct = newGrossMarginPct - baseGrossMarginPct
       const summaryRows = [
         ['Scenario', scenario.name],
-        ['Month', scenario.selectedMonth],
-        ['Saved At', scenario.savedAtLabel],
         ['Base Revenue', Math.round(baseRevenue)],
-        ['Recommended Revenue', Math.round(recommendedRevenue)],
-        ['Revenue Increase %', Number(revenueUpliftPct.toFixed(2))],
+        ['New Revenue', Math.round(newRevenue)],
+        ['Revenue Change %', Number(revenueChangePct.toFixed(2))],
         ['Base Volume', Math.round(baseVolume)],
-        ['Recommended Volume', Math.round(recommendedVolume)],
-        ['Volume Increase %', Number(volumeUpliftPct.toFixed(2))],
-        ['Base Profit', Math.round(baseProfit)],
-        ['Recommended Profit', Math.round(recommendedProfit)],
-        ['Profit Increase %', Number(profitUpliftPct.toFixed(2))],
+        ['New Volume', Math.round(newVolume)],
+        ['Volume Change %', Number(volumeChangePct.toFixed(2))],
+        ['Base Gross Margin %', Number(baseGrossMarginPct.toFixed(2))],
+        ['New Gross Margin %', Number(newGrossMarginPct.toFixed(2))],
+        ['Gross Margin Change %', Number(grossMarginChangePct.toFixed(2))],
       ]
-      const header = ['Product', 'Base Price', 'Recommended Price', 'Base Volume', 'Recommended Volume', 'Volume %', 'Revenue %', 'Profit %']
+      const header = ['SKU', 'Base Price', 'Adjusted Price', 'Base Volume', 'New Volume', 'Volume Change %']
       const dataRows = (scenario.rows ?? []).map((row) => [
         row.productName,
         Math.round(row.baseAsp ?? 0),
@@ -203,8 +209,6 @@ const downloadSavedScenariosWorkbook = (savedScenarios) => {
         Math.round(row.currentVolume ?? 0),
         Math.round(row.optimizedVolume ?? 0),
         ((row.volumeChangePct ?? 0) * 100).toFixed(2),
-        ((row.revenueChangePct ?? 0) * 100).toFixed(2),
-        ((row.profitChangePct ?? 0) * 100).toFixed(2),
       ])
 
       const tableRows = [
@@ -213,7 +217,7 @@ const downloadSavedScenariosWorkbook = (savedScenarios) => {
         `<Row>${header.map((value) => cell(value)).join('')}</Row>`,
         ...dataRows.map(
           (row) =>
-            `<Row>${cell(row[0])}${cell(row[1], 'Number')}${cell(row[2], 'Number')}${cell(row[3], 'Number')}${cell(row[4], 'Number')}${cell(row[5], 'Number')}${cell(row[6], 'Number')}${cell(row[7], 'Number')}</Row>`,
+            `<Row>${cell(row[0])}${cell(row[1], 'Number')}${cell(row[2], 'Number')}${cell(row[3], 'Number')}${cell(row[4], 'Number')}${cell(row[5], 'Number')}</Row>`,
         ),
       ].join('')
 
@@ -262,6 +266,7 @@ const buildCacheFingerprint = (selectedMonth, controls, productConstraints = {})
       premiumMaxDecrease: Number(controls.premiumMaxDecrease),
       premiumMaxIncrease: Number(controls.premiumMaxIncrease),
       premiumNoChange: Boolean(controls.premiumNoChange),
+      maxPriceChanges: controls.maxPriceChanges === '' ? null : Number(controls.maxPriceChanges),
       minVolumeUpliftPct:
         controls.minVolumeUpliftPct === '' ? null : Number(controls.minVolumeUpliftPct),
       minRevenueUpliftPct:
@@ -795,11 +800,12 @@ const AspDeterminationPage = () => {
       premiumMaxDecrease: clamp(parseNumber(searchParams.get('aPDec'), 100), 0, 150),
       premiumMaxIncrease: clamp(parseNumber(searchParams.get('aPInc'), 100), 0, 150),
       premiumNoChange: parseBool(searchParams.get('aPNo'), false),
+      maxPriceChanges: clamp(parseNumber(searchParams.get('aMaxChgCnt'), monthProducts.length), 0, 500),
       minVolumeUpliftPct: parseOptionalFilterParam(searchParams.get('aMinVol'), -100, 500),
       minRevenueUpliftPct: parseOptionalFilterParam(searchParams.get('aMinRev'), -100, 500),
       minProfitUpliftPct: parseOptionalFilterParam(searchParams.get('aMinProf'), -100, 500),
     }),
-    [searchParams],
+    [searchParams, monthProducts.length],
   )
 
   const buildDefaultProductConstraints = useCallback(
@@ -920,6 +926,10 @@ const AspDeterminationPage = () => {
       next.set('aPNo', '0')
       dirty = true
     }
+    if (!next.get('aMaxChgCnt')) {
+      next.set('aMaxChgCnt', String(monthProducts.length))
+      dirty = true
+    }
     ;['aMinVol', 'aMinRev', 'aMinProf'].forEach((filterKey) => {
       if (next.get(filterKey) === '-100') {
         next.delete(filterKey)
@@ -951,7 +961,7 @@ const AspDeterminationPage = () => {
     }
 
     setIsParamsReady(true)
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setSearchParams, monthProducts.length])
 
   useEffect(() => {
     if (!isParamsReady) return
@@ -1021,6 +1031,10 @@ const AspDeterminationPage = () => {
     if (patch.premiumMaxDecrease !== undefined) mapped.aPDec = clamp(Number(patch.premiumMaxDecrease) || 0, 0, 150)
     if (patch.premiumMaxIncrease !== undefined) mapped.aPInc = clamp(Number(patch.premiumMaxIncrease) || 0, 0, 150)
     if (patch.premiumNoChange !== undefined) mapped.aPNo = patch.premiumNoChange ? '1' : '0'
+    if (patch.maxPriceChanges !== undefined) {
+      mapped.aMaxChgCnt =
+        patch.maxPriceChanges === '' ? null : Math.max(0, Math.round(Number(patch.maxPriceChanges) || 0))
+    }
     if (patch.minVolumeUpliftPct !== undefined) {
       mapped.aMinVol =
         patch.minVolumeUpliftPct === '' ? null : clamp(Number(patch.minVolumeUpliftPct) || 0, -100, 500)
@@ -1060,6 +1074,11 @@ const AspDeterminationPage = () => {
             gross_margin_pct: controls.grossMarginPct,
             prompt: controls.prompt ?? '',
             scenario_count: 1000,
+            scenario_filters: {
+              ...(controls.maxPriceChanges === '' || controls.maxPriceChanges === null || controls.maxPriceChanges === undefined
+                ? {}
+                : { max_changed_count: Number(controls.maxPriceChanges) }),
+            },
             segment_constraints: {
               daily_casual: {
                 no_change: Boolean(controls.dailyNoChange),
@@ -1395,7 +1414,9 @@ const AspDeterminationPage = () => {
         scenarioName: picked.scenarioName ?? `Scenario ${picked.scenarioId}`,
         volumeLiftPct: Number(picked.volumeLiftPct ?? 0),
         revenueLiftPct: Number(picked.revenueLiftPct ?? 0),
-        profitLiftPct: Number(picked.profitLiftPct ?? 0),
+        grossMarginPct:
+          computeGrossMarginPct(Number(picked.totalProfit ?? 0), Number(picked.totalRevenue ?? 0)) -
+          computeGrossMarginPct(Number(selectionResult?.baseTotals?.totalProfit ?? 0), Number(selectionResult?.baseTotals?.totalRevenue ?? 0)),
         priceRows: detailRows,
       })
     },
@@ -1799,6 +1820,7 @@ const AspDeterminationPage = () => {
       aPDec: '100',
       aPInc: '100',
       aPNo: '0',
+      aMaxChgCnt: String(monthProducts.length),
       aMinVol: null,
       aMinRev: null,
       aMinProf: null,
@@ -2175,9 +2197,11 @@ const AspDeterminationPage = () => {
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Profit</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Gross Margin</p>
                   <p className="mt-1 text-sm font-bold text-slate-800">
-                    {(scenarioConfirm.profitLiftPct * 100 >= 0 ? '+' : '') + (scenarioConfirm.profitLiftPct * 100).toFixed(1)}%
+                    {(Number(scenarioConfirm.grossMarginPct ?? 0) >= 0 ? '+' : '') +
+                      Number(scenarioConfirm.grossMarginPct ?? 0).toFixed(1)}
+                    %
                   </p>
                 </div>
               </div>

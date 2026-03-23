@@ -108,10 +108,17 @@ def _normalize_scenario_filters(raw_filters: dict[str, float] | None) -> dict[st
     min_volume = _safe_float(source.get("min_volume_uplift_pct"), -9999.0) / 100.0
     min_revenue = _safe_float(source.get("min_revenue_uplift_pct"), -9999.0) / 100.0
     min_profit = _safe_float(source.get("min_profit_uplift_pct"), -9999.0) / 100.0
+    max_changed_count_raw = source.get("max_changed_count")
+    max_changed_count = -1.0
+    if max_changed_count_raw is not None:
+        parsed_max_changed = _safe_float(max_changed_count_raw, -1.0)
+        if parsed_max_changed >= 0:
+            max_changed_count = float(int(round(parsed_max_changed)))
     return {
         "min_volume_uplift": min_volume,
         "min_revenue_uplift": min_revenue,
         "min_profit_uplift": min_profit,
+        "max_changed_count": max_changed_count,
     }
 
 
@@ -168,6 +175,7 @@ def _scenario_passes_filters(
     totals: dict[str, float],
     base_totals: dict[str, float],
     scenario_filters: dict[str, float],
+    changed_count: int,
 ) -> bool:
     base_volume = max(1.0, float(base_totals.get("total_volume", 0.0)))
     base_revenue = max(1.0, float(base_totals.get("total_revenue", 0.0)))
@@ -179,10 +187,12 @@ def _scenario_passes_filters(
     revenue_uplift = (float(totals["total_revenue"]) - base_revenue) / base_revenue
     profit_uplift = (float(totals["total_profit"]) - base_profit) / abs(base_profit)
 
+    max_changed_count = int(_safe_float(scenario_filters.get("max_changed_count"), -1.0))
     return (
         volume_uplift >= _safe_float(scenario_filters.get("min_volume_uplift"), -9999.0)
         and revenue_uplift >= _safe_float(scenario_filters.get("min_revenue_uplift"), -9999.0)
         and profit_uplift >= _safe_float(scenario_filters.get("min_profit_uplift"), -9999.0)
+        and (max_changed_count < 0 or int(changed_count) <= max_changed_count)
     )
 
 
@@ -1048,9 +1058,10 @@ def _generate_mc_states(
             gamma_matrix=gamma_matrix,
             unit_costs=unit_costs,
         )
+        changed_count = sum(1 for p_idx, price in enumerate(prices) if abs(float(price) - float(base_prices[p_idx])) >= 0.5)
         if not _satisfies_min_gross_margin(totals, min_gross_margin_pct):
             continue
-        if not _scenario_passes_filters(totals, base_totals, scenario_filters):
+        if not _scenario_passes_filters(totals, base_totals, scenario_filters, changed_count):
             continue
         state = {
             "prices": prices,
@@ -1328,6 +1339,11 @@ def optimize_asp_portfolio(
                 "min_profit_uplift_pct": _safe_float(request.scenario_filters.get("min_profit_uplift_pct"), 0.0)
                 if isinstance(request.scenario_filters, dict)
                 else 0.0,
+                "max_changed_count": (
+                    int(round(_safe_float(request.scenario_filters.get("max_changed_count"), -1.0)))
+                    if isinstance(request.scenario_filters, dict) and request.scenario_filters.get("max_changed_count") is not None
+                    else None
+                ),
             },
             "product_segments": [
                 {"product_name": sorted_rows[index].get("productName", f"P{index+1}"), "segment": product_segments[index]}

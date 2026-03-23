@@ -112,6 +112,7 @@ const SegmentWorkspacePanel = ({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-lg font-bold text-slate-800">Adjust Price Ladder</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Plan for Season: Winter 2026</p>
           {selectedScenarioName && !isBaseOnly ? (
             <p className="mt-1 text-xs font-semibold text-slate-600">Scenario: {selectedScenarioName}</p>
           ) : null}

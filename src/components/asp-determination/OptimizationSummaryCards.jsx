@@ -45,12 +45,6 @@ const ScenarioTooltip = ({ active, payload }) => {
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <p className="text-sm font-semibold text-[#0F172A]">{row.scenarioName}</p>
       <p className="text-xs text-slate-600">Family: {row.scenarioFamily}</p>
-      <p className="mt-1 text-xs text-slate-600">Volume: {formatInt(row.totalVolume)}</p>
-      <p className="text-xs text-slate-600">Revenue: {formatCurrency(row.totalRevenue)}</p>
-      <p className="text-xs text-slate-600">Profit: {formatCurrency(row.totalProfit)}</p>
-      <p className="mt-1 text-xs text-slate-600">Volume %: {formatShortPct(row.volumePct)}</p>
-      <p className="text-xs text-slate-600">Revenue %: {formatShortPct(row.revenuePct)}</p>
-      <p className="text-xs text-slate-600">Gross Margin %: {formatShortPct(row.grossMarginPct)}</p>
     </div>
   )
 }
@@ -131,14 +125,14 @@ export function getScenarioSelectionSummary(result, scenarioFilters) {
 
   const minVolumeIncreasePct = parseOptionalThreshold(scenarioFilters?.minVolumeUpliftPct)
   const minRevenueIncreasePct = parseOptionalThreshold(scenarioFilters?.minRevenueUpliftPct)
-  const minProfitIncreasePct = parseOptionalThreshold(scenarioFilters?.minProfitUpliftPct)
+  const minGrossMarginIncreasePct = parseOptionalThreshold(scenarioFilters?.minProfitUpliftPct)
   const skuConstraints = scenarioFilters?.productConstraints ?? {}
 
   const filteredScenarios = enrichedScenarios.filter(
     (scenario) =>
       (minVolumeIncreasePct === null || scenario.volumePct >= minVolumeIncreasePct) &&
       (minRevenueIncreasePct === null || scenario.revenuePct >= minRevenueIncreasePct) &&
-      (minProfitIncreasePct === null || scenario.profitPct >= minProfitIncreasePct) &&
+      (minGrossMarginIncreasePct === null || scenario.grossMarginPct >= minGrossMarginIncreasePct) &&
       isScenarioWithinSkuConstraints(result, scenario.scenarioId, skuConstraints),
   )
 

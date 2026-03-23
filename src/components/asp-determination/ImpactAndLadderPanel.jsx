@@ -16,18 +16,19 @@ const SEGMENT_COLORS = {
 
 const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value))
 const formatCurrency = (value) => `INR ${formatInt(value)}`
+const formatPct = (value) => `${Number(value).toFixed(1)}%`
 const formatSignedPct = (value) => {
   const pct = Number(value) * 100
   const sign = pct >= 0 ? '+' : ''
   return `${sign}${pct.toFixed(1)}%`
 }
 
-const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false }) => {
-  const deltaPct = baseValue === 0 ? 0 : (newValue - baseValue) / baseValue
+const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false, isRate = false }) => {
+  const deltaPct = isRate ? (newValue - baseValue) / 100 : baseValue === 0 ? 0 : (newValue - baseValue) / baseValue
   const isPositive = deltaPct >= 0
   const width = Math.min(100, Math.abs(deltaPct * 100))
-  const fromText = isCurrency ? formatCurrency(baseValue) : formatInt(baseValue)
-  const toText = isCurrency ? formatCurrency(newValue) : formatInt(newValue)
+  const fromText = isRate ? formatPct(baseValue) : isCurrency ? formatCurrency(baseValue) : formatInt(baseValue)
+  const toText = isRate ? formatPct(newValue) : isCurrency ? formatCurrency(newValue) : formatInt(newValue)
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -76,6 +77,8 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
   const newRevenue = rows.reduce((sum, row) => sum + (row.optimizedRevenue ?? 0), 0)
   const baseProfit = rows.reduce((sum, row) => sum + (row.currentProfit ?? 0), 0)
   const newProfit = rows.reduce((sum, row) => sum + (row.optimizedProfit ?? 0), 0)
+  const baseGrossMargin = baseRevenue === 0 ? 0 : (baseProfit / baseRevenue) * 100
+  const newGrossMargin = newRevenue === 0 ? 0 : (newProfit / newRevenue) * 100
 
   const ladderRows = rows
     .slice()
@@ -96,7 +99,7 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricBarCard label="Volume" baseValue={baseVolume} newValue={newVolume} />
             <MetricBarCard label="Revenue" baseValue={baseRevenue} newValue={newRevenue} isCurrency />
-            <MetricBarCard label="Profit" baseValue={baseProfit} newValue={newProfit} isCurrency />
+            <MetricBarCard label="Gross Margin" baseValue={baseGrossMargin} newValue={newGrossMargin} isRate />
           </div>
           <p className="text-[10px] font-medium leading-snug text-slate-500">
             Projections reflect both a baseline forecast and the impact of price adjustments. Growth rates are Y-o-Y
