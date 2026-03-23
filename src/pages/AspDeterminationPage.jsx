@@ -684,6 +684,56 @@ const buildBaselineResult = (selectedMonth, monthRows = []) => {
   }
 }
 
+const TrinityAiStarryMark = () => (
+  <span className="relative mx-0.5 inline-block align-baseline font-extrabold">
+    <span
+      className="pointer-events-none absolute -left-2 -top-2.5 select-none text-[11px] leading-none text-amber-400 drop-shadow-sm animate-pulse"
+      aria-hidden
+    >
+      ✦
+    </span>
+    <span
+      className="pointer-events-none absolute -right-1 -top-1 select-none text-[9px] leading-none text-sky-300 animate-pulse"
+      style={{ animationDelay: '0.35s' }}
+      aria-hidden
+    >
+      ⋆
+    </span>
+    <span
+      className="pointer-events-none absolute -left-3 top-1/2 -translate-y-1/2 select-none text-[8px] leading-none text-indigo-300/90 animate-pulse"
+      style={{ animationDelay: '0.15s' }}
+      aria-hidden
+    >
+      ✧
+    </span>
+    <span
+      className="pointer-events-none absolute -right-2.5 top-1/2 -translate-y-1/2 select-none text-[9px] leading-none text-violet-300/90 animate-pulse"
+      style={{ animationDelay: '0.55s' }}
+      aria-hidden
+    >
+      ✦
+    </span>
+    <span
+      className="pointer-events-none absolute -bottom-1 left-0 select-none text-[8px] leading-none text-amber-300/85 animate-pulse"
+      style={{ animationDelay: '0.25s' }}
+      aria-hidden
+    >
+      ★
+    </span>
+    <span
+      className="pointer-events-none absolute -bottom-0.5 right-0.5 select-none text-[6px] leading-none text-blue-300/80 animate-pulse"
+      style={{ animationDelay: '0.7s' }}
+      aria-hidden
+    >
+      ·
+    </span>
+    <span className="pointer-events-none absolute inset-0 -z-10 rounded-md bg-gradient-to-br from-indigo-500/15 via-violet-500/10 to-sky-500/15 blur-md" aria-hidden />
+    <span className="relative z-[1] bg-gradient-to-r from-indigo-700 via-violet-600 to-blue-600 bg-clip-text text-transparent">
+      TrinityAI
+    </span>
+  </span>
+)
+
 const AspDeterminationPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [optimizationResult, setOptimizationResult] = useState(null)
@@ -701,13 +751,14 @@ const AspDeterminationPage = () => {
   const [recommendedPriceEditMap, setRecommendedPriceEditMap] = useState({})
   const [recommendedPriceDraftMap, setRecommendedPriceDraftMap] = useState({})
   const [uiStage, setUiStage] = useState('setup')
-  const [generationCollapsed, setGenerationCollapsed] = useState(false)
+  const [generationCollapsed, setGenerationCollapsed] = useState(true)
   const [selectionCollapsed, setSelectionCollapsed] = useState(false)
-  const [selectedSegment, setSelectedSegment] = useState(null)
+  const [selectedSegment, setSelectedSegment] = useState('daily')
   const [savedScenarios, setSavedScenarios] = useState(() => readStep3SavedScenarios())
   const [savedDockOpen, setSavedDockOpen] = useState(false)
   const [isLadderModalOpen, setIsLadderModalOpen] = useState(false)
   const [scenarioConfirm, setScenarioConfirm] = useState(null)
+  const [savePlanDialog, setSavePlanDialog] = useState({ open: false, name: '' })
   const animationFrameRef = useRef(null)
   const savedDockRef = useRef(null)
 
@@ -929,7 +980,7 @@ const AspDeterminationPage = () => {
     setUiStage(snapshot.uiStage ?? 'workspace')
     setGenerationCollapsed(Boolean(snapshot.generationCollapsed))
     setSelectionCollapsed(Boolean(snapshot.selectionCollapsed))
-    setSelectedSegment(snapshot.selectedSegment ?? null)
+    setSelectedSegment(snapshot.selectedSegment ?? 'daily')
     setProductConstraints(snapshot.productConstraints ?? {})
     setBasePriceEditMap(snapshot.basePriceEditMap ?? {})
     setBasePriceDraftMap({})
@@ -1073,56 +1124,12 @@ const AspDeterminationPage = () => {
         setRunNotice(`Optimization completed. ${scenarioCount} scenarios generated.`)
         setTimeout(() => setRunNotice(''), 3000)
 
-        if (!animate || !displayResult) {
-          setOptimizationResult(result)
-          setDisplayResult(result)
-          setBasePriceEditMap({})
-          setBasePriceDraftMap({})
-          setRecommendedPriceEditMap({})
-          setRecommendedPriceDraftMap({})
-          setSelectedSegment(null)
-          setUiStage('selection')
-          setGenerationCollapsed(true)
-          setSelectionCollapsed(false)
-          writeCachedResult({ selectedMonth, controls, productConstraints, result })
-          setJobProgress({ progressPct: 100, stage: 'Completed' })
-          return
-        }
-
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current)
-        }
-
-        const fromResult = displayResult
-        const start = performance.now()
-        const durationMs = 850
-
-        const animateFrame = (now) => {
-          const rawProgress = Math.min((now - start) / durationMs, 1)
-          const easedProgress = 1 - (1 - rawProgress) ** 3
-          setDisplayResult(buildInterpolatedResult(fromResult, result, easedProgress))
-
-          if (rawProgress < 1) {
-            animationFrameRef.current = requestAnimationFrame(animateFrame)
-            return
-          }
-
-          setOptimizationResult(result)
-          setDisplayResult(result)
-          setBasePriceEditMap({})
-          setBasePriceDraftMap({})
-          setRecommendedPriceEditMap({})
-          setRecommendedPriceDraftMap({})
-          setSelectedSegment(null)
-          setUiStage('selection')
-          setGenerationCollapsed(true)
-          setSelectionCollapsed(false)
-          writeCachedResult({ selectedMonth, controls, productConstraints, result })
-          setJobProgress({ progressPct: 100, stage: 'Completed' })
-          animationFrameRef.current = null
-        }
-
-        animationFrameRef.current = requestAnimationFrame(animateFrame)
+        setOptimizationResult(result)
+        setUiStage('selection')
+        setGenerationCollapsed(true)
+        setSelectionCollapsed(false)
+        writeCachedResult({ selectedMonth, controls, productConstraints, result })
+        setJobProgress({ progressPct: 100, stage: 'Completed' })
       } catch (error) {
         setOptimizationError(error?.message || 'Optimization request failed.')
         setRunNotice('')
@@ -1148,7 +1155,7 @@ const AspDeterminationPage = () => {
         setBasePriceDraftMap({})
         setRecommendedPriceEditMap({})
         setRecommendedPriceDraftMap({})
-        setSelectedSegment(null)
+        setSelectedSegment('daily')
         writeCachedResult({ selectedMonth, controls, productConstraints, result: targetResult })
         return
       }
@@ -1176,7 +1183,7 @@ const AspDeterminationPage = () => {
         setBasePriceDraftMap({})
         setRecommendedPriceEditMap({})
         setRecommendedPriceDraftMap({})
-        setSelectedSegment(null)
+        setSelectedSegment('daily')
         writeCachedResult({ selectedMonth, controls, productConstraints, result: targetResult })
         animationFrameRef.current = null
       }
@@ -1273,13 +1280,14 @@ const AspDeterminationPage = () => {
   }
 
   const activeResult = displayResult ?? optimizationResult ?? baselineResult
+  const selectionSourceResult = optimizationResult ?? activeResult
 
   const selectionResult = useMemo(() => {
-    if (!activeResult) return null
-    const firstScenarioId = activeResult.scenarioSummaries?.[0]?.scenarioId
+    if (!selectionSourceResult) return null
+    const firstScenarioId = selectionSourceResult.scenarioSummaries?.[0]?.scenarioId
     const seedRows =
-      activeResult.scenarioDetails?.[firstScenarioId]?.optimizedProducts ??
-      activeResult.optimizedProducts
+      selectionSourceResult.scenarioDetails?.[firstScenarioId]?.optimizedProducts ??
+      selectionSourceResult.optimizedProducts
     const baseScenarioRows = (seedRows ?? []).map((row) => ({
       ...row,
       optimizedAsp: row.baseAsp ?? row.currentAsp,
@@ -1296,21 +1304,22 @@ const AspDeterminationPage = () => {
       rows: baseScenarioRows,
       selectedMonth,
       basePriceEditMap: {},
-      modelContext: activeResult.modelContext,
+      modelContext: selectionSourceResult.modelContext,
     })
     const baseTotalsComputed = computeTotalsFromRows(driftedBaseRows)
     const baselineRevenue = Math.max(1, baseTotalsComputed.baseRevenue)
     const baselineProfit = Math.max(1, Math.abs(baseTotalsComputed.baseProfit))
     const baselineVolume = Math.max(1, baseTotalsComputed.baseVolume)
 
-    const scenarioSummaries = (activeResult.scenarioSummaries ?? []).map((scenario) => {
+    const scenarioSummaries = (selectionSourceResult.scenarioSummaries ?? []).map((scenario) => {
       const detailRows =
-        activeResult.scenarioDetails?.[scenario.scenarioId]?.optimizedProducts ?? activeResult.optimizedProducts
+        selectionSourceResult.scenarioDetails?.[scenario.scenarioId]?.optimizedProducts ??
+        selectionSourceResult.optimizedProducts
       const driftedRows = buildDisplayRows({
         rows: detailRows,
         selectedMonth,
         basePriceEditMap: {},
-        modelContext: activeResult.modelContext,
+        modelContext: selectionSourceResult.modelContext,
       })
       const totals = computeTotalsFromRows(driftedRows)
       return {
@@ -1325,7 +1334,7 @@ const AspDeterminationPage = () => {
     })
 
     return {
-      ...activeResult,
+      ...selectionSourceResult,
       baseTotals: {
         totalVolume: baseTotalsComputed.baseVolume,
         totalRevenue: baseTotalsComputed.baseRevenue,
@@ -1333,7 +1342,7 @@ const AspDeterminationPage = () => {
       },
       scenarioSummaries,
     }
-  }, [activeResult, selectedMonth])
+  }, [selectionSourceResult, selectedMonth])
 
   const scenarioPanelHeaderSummary = useMemo(
     () =>
@@ -1342,6 +1351,7 @@ const AspDeterminationPage = () => {
             minVolumeUpliftPct: controls.minVolumeUpliftPct,
             minRevenueUpliftPct: controls.minRevenueUpliftPct,
             minProfitUpliftPct: controls.minProfitUpliftPct,
+            productConstraints,
           })
         : null,
     [
@@ -1349,6 +1359,7 @@ const AspDeterminationPage = () => {
       controls.minVolumeUpliftPct,
       controls.minRevenueUpliftPct,
       controls.minProfitUpliftPct,
+      productConstraints,
     ],
   )
 
@@ -1575,13 +1586,26 @@ const AspDeterminationPage = () => {
     })
   }
 
-  const handleSaveScenario = () => {
+  const getNextDefaultPlanName = useCallback(() => {
+    const usedNumbers = new Set(
+      savedScenarios
+        .map((item) => {
+          const match = String(item?.name ?? '').match(/^Price Ladder\s+(\d+)$/i)
+          return match ? Number(match[1]) : null
+        })
+        .filter((value) => Number.isFinite(value) && value > 0),
+    )
+
+    let nextNumber = 1
+    while (usedNumbers.has(nextNumber)) nextNumber += 1
+    return `Price Ladder ${nextNumber}`
+  }, [savedScenarios])
+
+  const handleSaveScenario = (overrideName) => {
     const source = displayViewResult ?? activeResult
     if (!source?.optimizedProducts?.length) return
 
-    const scenarioName =
-      source.scenarioSummaries?.find((item) => item.scenarioId === source.selectedScenarioId)?.scenarioName ??
-      `Scenario ${source.selectedScenarioId}`
+    const scenarioName = String(overrideName ?? '').trim() || getNextDefaultPlanName()
     const snapshot = buildStep3SavedScenarioSnapshot({
       source,
       scenarioName,
@@ -1599,10 +1623,25 @@ const AspDeterminationPage = () => {
     setTimeout(() => setSaveNotice(''), 2500)
   }
 
+  const handleOpenSavePlanDialog = useCallback(() => {
+    setSavePlanDialog({
+      open: true,
+      name: getNextDefaultPlanName(),
+    })
+  }, [getNextDefaultPlanName])
+
+  const handleConfirmSavePlan = useCallback(() => {
+    const planName = String(savePlanDialog.name ?? '').trim() || getNextDefaultPlanName()
+    handleSaveScenario(planName)
+    setSavePlanDialog({ open: false, name: '' })
+  }, [savePlanDialog.name, getNextDefaultPlanName])
+
   const handleResetBasePrices = useCallback(() => {
     setBasePriceEditMap({})
     setBasePriceDraftMap({})
-    setSelectedSegment(null)
+    setRecommendedPriceEditMap({})
+    setRecommendedPriceDraftMap({})
+    setSelectedSegment('daily')
     setRunNotice('Prices reset to base.')
     setTimeout(() => setRunNotice(''), 2200)
   }, [])
@@ -1622,10 +1661,115 @@ const AspDeterminationPage = () => {
     setBasePriceDraftMap({})
     setRecommendedPriceEditMap(resetRecommendedMap)
     setRecommendedPriceDraftMap({})
-    setSelectedSegment(null)
+    setSelectedSegment('daily')
     setRunNotice('Reset to Base Scenario applied.')
     setTimeout(() => setRunNotice(''), 2200)
   }, [activeResult])
+
+  const handleApplySavedScenario = useCallback(
+    (savedItem) => {
+      const rawRows = savedItem?.rows ?? savedItem?.optimizedProducts ?? []
+      if (!rawRows.length) return
+
+      const scenarioId = String(savedItem.selectedScenarioId ?? `saved_${savedItem.id ?? Date.now()}`)
+      const modelContext = activeResult?.modelContext ?? optimizationResult?.modelContext ?? baselineResult?.modelContext ?? {}
+      const savedRows = rawRows.map((row) => {
+        const baseAsp = Number(row.baseAsp ?? row.currentAsp ?? row.basePrice ?? 1)
+        const optimizedAsp = Number(row.optimizedAsp ?? row.recommendedPrice ?? row.currentAsp ?? baseAsp)
+        const currentVolume = Number(row.currentVolume ?? row.baseVolume ?? 1)
+        const optimizedVolume = Number(row.optimizedVolume ?? row.recommendedVolume ?? currentVolume)
+        const currentRevenue = Number(row.currentRevenue ?? baseAsp * currentVolume)
+        const optimizedRevenue = Number(row.optimizedRevenue ?? optimizedAsp * optimizedVolume)
+        const unitCost = baseAsp * 0.4
+        const currentProfit = Number(row.currentProfit ?? (baseAsp - unitCost) * currentVolume)
+        const optimizedProfit = Number(row.optimizedProfit ?? (optimizedAsp - unitCost) * optimizedVolume)
+
+        return {
+          ...row,
+          baseAsp,
+          currentAsp: Number(row.currentAsp ?? baseAsp),
+          optimizedAsp,
+          currentVolume,
+          optimizedVolume,
+          currentRevenue,
+          optimizedRevenue,
+          currentProfit,
+          optimizedProfit,
+          volumeChangePct: currentVolume === 0 ? 0 : (optimizedVolume - currentVolume) / currentVolume,
+          revenueChangePct: currentRevenue === 0 ? 0 : (optimizedRevenue - currentRevenue) / currentRevenue,
+          profitChangePct: currentProfit === 0 ? 0 : (optimizedProfit - currentProfit) / currentProfit,
+          segmentKey: row.segmentKey ?? getSegmentKey(baseAsp),
+          segmentLabel: row.segmentLabel ?? getSegmentLabel(baseAsp),
+        }
+      })
+      const baselineRows = savedRows.map((row) => ({
+        ...row,
+        optimizedAsp: row.baseAsp,
+        optimizedVolume: row.currentVolume,
+        optimizedRevenue: row.currentRevenue,
+        optimizedProfit: row.currentProfit,
+        volumeChangePct: 0,
+        revenueChangePct: 0,
+        profitChangePct: 0,
+        basePriceChange: 0,
+        basePriceChangePct: 0,
+        aspChange: 0,
+        aspChangePct: 0,
+      }))
+      const replayedBasePriceMap = Object.fromEntries(
+        savedRows
+          .filter((row) => Math.abs(Number(row.optimizedAsp ?? row.baseAsp) - Number(row.baseAsp)) > 0.5)
+          .map((row) => [row.productName, Math.round(Number(row.optimizedAsp ?? row.baseAsp))]),
+      )
+
+      const savedResult = {
+        controls: {},
+        selectedMonth: selectedMonth,
+        selectedScenarioId: scenarioId,
+        scenarioSummaries: [
+          {
+            scenarioId,
+            scenarioName: savedItem.name || `Price Ladder`,
+            scenarioFamily: 'Saved Plan',
+            rank: 1,
+            objectiveValue: Number(savedItem.optimizedTotals?.totalRevenue ?? 0),
+            totalVolume: Number(savedItem.optimizedTotals?.totalVolume ?? 0),
+            totalRevenue: Number(savedItem.optimizedTotals?.totalRevenue ?? 0),
+            totalProfit: Number(savedItem.optimizedTotals?.totalProfit ?? 0),
+            volumeLiftPct: 0,
+            revenueLiftPct: 0,
+            profitLiftPct: 0,
+          },
+        ],
+        scenarioDetails: {
+          [scenarioId]: {
+            optimizedProducts: baselineRows,
+          },
+        },
+        optimizedProducts: baselineRows,
+        modelContext,
+        baseTotals: savedItem.baseTotals ?? {},
+        optimizedTotals: savedItem.optimizedTotals ?? {},
+      }
+
+      setOptimizationResult(savedResult)
+      setDisplayResult(savedResult)
+      setBasePriceEditMap(replayedBasePriceMap)
+      setBasePriceDraftMap({})
+      setRecommendedPriceEditMap({})
+      setRecommendedPriceDraftMap({})
+      const availableSegments = new Set(baselineRows.map((row) => row.segmentKey))
+      const defaultSegment = ['daily', 'core', 'premium'].find((key) => availableSegments.has(key)) ?? null
+      setSelectedSegment(defaultSegment)
+      setGenerationCollapsed(true)
+      setSelectionCollapsed(true)
+      setUiStage('workspace')
+      setSavedDockOpen(false)
+      setRunNotice(`Loaded saved plan: ${savedItem.name}`)
+      setTimeout(() => setRunNotice(''), 2200)
+    },
+    [activeResult, optimizationResult, baselineResult, selectedMonth],
+  )
 
   const handleDeleteSavedScenario = (id) => {
     const next = savedScenarios.filter((item) => item.id !== id)
@@ -1700,8 +1844,8 @@ const AspDeterminationPage = () => {
   useEffect(() => {
     const rows = displayViewResult?.optimizedProducts ?? []
     if (!rows.length) return
-    if (selectedSegment == null) return
     const available = new Set(rows.map((row) => row.segmentKey ?? getSegmentKey(row.baseAsp ?? row.currentAsp)))
+    if (selectedSegment == null) return
     if (!available.has(selectedSegment)) {
       const nextSegment = ['daily', 'core', 'premium'].find((key) => available.has(key)) ?? null
       setSelectedSegment(nextSegment)
@@ -1744,7 +1888,8 @@ const AspDeterminationPage = () => {
                   {normalizedSavedScenarios.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between rounded border border-slate-200 bg-white px-2 py-1.5"
+                      onClick={() => handleApplySavedScenario(item)}
+                      className="flex cursor-pointer items-center justify-between rounded border border-slate-200 bg-white px-2 py-1.5 hover:bg-slate-50"
                     >
                       <div className="min-w-0 pr-2">
                         <p className="truncate text-[11px] font-semibold text-slate-700">{item.name}</p>
@@ -1752,7 +1897,10 @@ const AspDeterminationPage = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleDeleteSavedScenario(item.id)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleDeleteSavedScenario(item.id)
+                        }}
                         className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-rose-600"
                         title="Delete saved scenario"
                       >
@@ -1766,14 +1914,16 @@ const AspDeterminationPage = () => {
           </div>
         )}
 
-        <div className="panel overflow-hidden">
+        <div className="panel">
           <button
             type="button"
             onClick={() => setGenerationCollapsed((prev) => !prev)}
             className="flex w-full items-center justify-between border-b border-slate-200 px-4 py-3 text-left"
           >
             <div>
-              <h3 className="text-lg font-bold text-slate-800">Simulate pricing scenarios with TrinityAI</h3>
+              <h3 className="text-lg font-bold text-slate-800">
+                Simulate pricing scenarios with <TrinityAiStarryMark />
+              </h3>
             </div>
             {generationCollapsed ? <ChevronRight className="h-4 w-4 text-slate-600" /> : <ChevronDown className="h-4 w-4 text-slate-600" />}
           </button>
@@ -1882,6 +2032,7 @@ const AspDeterminationPage = () => {
                       minVolumeUpliftPct: controls.minVolumeUpliftPct,
                       minRevenueUpliftPct: controls.minRevenueUpliftPct,
                       minProfitUpliftPct: controls.minProfitUpliftPct,
+                      productConstraints,
                     }}
                   />
                 ) : null}
@@ -1922,7 +2073,7 @@ const AspDeterminationPage = () => {
               recommendedInputValues={recommendedInputValues}
               onRecommendedInputChange={handleRecommendedDraftChange}
               onRecommendedCommit={handleRecommendedCommit}
-              onSaveScenario={handleSaveScenario}
+              onSaveScenario={handleOpenSavePlanDialog}
               onResetToBaseScenario={handleResetToBaseScenario}
               onResetBasePrices={handleResetBasePrices}
               selectedScenarioName={selectedScenarioName}
@@ -1970,6 +2121,39 @@ const AspDeterminationPage = () => {
         {optimizationError && (
           <div className="fixed bottom-28 right-5 z-50 max-w-[440px] rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 shadow">
             <p className="text-xs font-semibold text-rose-700">{optimizationError}</p>
+          </div>
+        )}
+        {savePlanDialog.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 px-4">
+            <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-4 shadow-2xl">
+              <h4 className="text-base font-bold text-slate-800">Save Plan</h4>
+              <p className="mt-1 text-xs font-medium text-slate-600">Choose a name for this saved price ladder.</p>
+              <input
+                type="text"
+                value={savePlanDialog.name}
+                onChange={(event) => setSavePlanDialog((prev) => ({ ...prev, name: event.target.value }))}
+                className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder={getNextDefaultPlanName()}
+                maxLength={80}
+                autoFocus
+              />
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSavePlanDialog({ open: false, name: '' })}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSavePlan}
+                  className="rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         )}
         {scenarioConfirm && (

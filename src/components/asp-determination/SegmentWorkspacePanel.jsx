@@ -95,22 +95,6 @@ const SegmentWorkspacePanel = ({
     return (parseNumeric(row.optimizedRevenue, 0) / total) * 100
   }
 
-  /** Same numeric styling as base ladder table (elasticity + contribution columns). */
-  const renderProductSignals = (row, segmentRecRevenue) => {
-    const contributionPct = getContributionPctForSegment(row, segmentRecRevenue)
-    const elasticity = parseNumeric(row.ownElasticity, -1)
-
-    return (
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_140px_210px] items-center gap-2">
-        <p className="min-w-0 whitespace-normal break-words text-[13px] font-semibold leading-4 text-slate-800">
-          {normalizeProductLabel(row.productName)}
-        </p>
-        <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
-        <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
-      </div>
-    )
-  }
-
   const handleBaseSliderChange = (row, nextValue) => {
     const value = String(Math.round(parseNumeric(nextValue, row.baseAsp)))
     onBaseInputChange?.(row.productName, value)
@@ -158,7 +142,7 @@ const SegmentWorkspacePanel = ({
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               <Save className="h-3.5 w-3.5" />
-              {isBaseOnly ? 'Save Base Plan' : 'Save Scenario'}
+              {isBaseOnly ? 'Save Plan' : 'Save Scenario'}
             </button>
           </div>
         ) : null}
@@ -254,8 +238,10 @@ const SegmentWorkspacePanel = ({
                       <div className="overflow-x-auto">
                         {isBaseOnly ? (
                           <>
-                            <div className="grid min-w-[900px] grid-cols-[minmax(0,1.8fr)_104px_24px_184px_98px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <div className="grid min-w-[1240px] grid-cols-[minmax(0,1.4fr)_140px_210px_104px_24px_184px_98px] gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                               <span>SKU</span>
+                              <span className="text-right">Elasticity</span>
+                              <span className="text-right">Contribution to Sales</span>
                               <span className="text-right">Current Price</span>
                               <span className="text-center">&nbsp;</span>
                               <span className="text-right">Adjusted</span>
@@ -263,6 +249,8 @@ const SegmentWorkspacePanel = ({
                             </div>
                             <div className="divide-y divide-slate-100">
                               {detailRows.map((row) => {
+                                const elasticity = parseNumeric(row.ownElasticity, -1)
+                                const contributionPct = getContributionPctForSegment(row, segment.recRevenue)
                                 const currentBase = Math.round(parseNumeric(row.baseAsp, 0))
                                 const adjustedBase = getSliderValue(
                                   baseInputValues?.[row.productName] ?? row.baseAsp,
@@ -273,9 +261,13 @@ const SegmentWorkspacePanel = ({
                                 return (
                                   <div
                                     key={row.productName}
-                                    className="grid min-w-[900px] grid-cols-[minmax(0,1.8fr)_104px_24px_184px_98px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
+                                    className="grid min-w-[1240px] grid-cols-[minmax(0,1.4fr)_140px_210px_104px_24px_184px_98px] items-center gap-2 px-2 py-2.5 hover:bg-slate-50/70"
                                   >
-                                    <div className="min-w-0">{renderProductSignals(row, segment.recRevenue)}</div>
+                                    <div className="min-w-0 line-clamp-2 break-words text-[13px] font-semibold leading-4 text-slate-800">
+                                      {normalizeProductLabel(row.productName)}
+                                    </div>
+                                    <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
+                                    <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
 
                                     <div className="text-right">
                                       <span className="text-[12px] font-bold text-slate-700">{formatCurrency(currentBase)}</span>

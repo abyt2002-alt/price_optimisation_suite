@@ -1,12 +1,10 @@
-import { formatYearMonthLabel } from './insightsUtils'
-
 export const buildStep3SavedScenarioSnapshot = ({ source, scenarioName }) => {
   const now = new Date()
   const savedAtLabel = now.toLocaleString('en-IN')
 
   return {
     id: `step3_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    name: `${scenarioName} - ${formatYearMonthLabel(source.selectedMonth)}`,
+    name: String(scenarioName ?? '').trim(),
     selectedMonth: source.selectedMonth,
     selectedScenarioId: source.selectedScenarioId,
     savedAt: now.toISOString(),
