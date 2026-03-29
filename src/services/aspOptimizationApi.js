@@ -10,14 +10,34 @@ const parseApiError = async (response) => {
   return `Optimization request failed (${response.status})`
 }
 
+const withNetworkHint = async (requestFn) => {
+  try {
+    return await requestFn()
+  } catch (error) {
+    const message = String(error?.message || '')
+    const isNetworkIssue =
+      message.toLowerCase().includes('failed to fetch') ||
+      message.toLowerCase().includes('networkerror') ||
+      message.toLowerCase().includes('network request failed')
+    if (isNetworkIssue) {
+      throw new Error(
+        'Backend API is unreachable. Start backend on http://127.0.0.1:8011 and retry.',
+      )
+    }
+    throw error
+  }
+}
+
 export const optimizeAspLadder = async (requestPayload) => {
-  const response = await fetch('/api/asp-determination/optimize', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestPayload),
-  })
+  const response = await withNetworkHint(() =>
+    fetch('/api/asp-determination/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestPayload),
+    }),
+  )
 
   if (!response.ok) {
     throw new Error(await parseApiError(response))
@@ -27,13 +47,15 @@ export const optimizeAspLadder = async (requestPayload) => {
 }
 
 export const createAspOptimizationJob = async (requestPayload) => {
-  const response = await fetch('/api/asp-determination/optimize-jobs', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestPayload),
-  })
+  const response = await withNetworkHint(() =>
+    fetch('/api/asp-determination/optimize-jobs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestPayload),
+    }),
+  )
 
   if (!response.ok) {
     throw new Error(await parseApiError(response))
@@ -43,7 +65,9 @@ export const createAspOptimizationJob = async (requestPayload) => {
 }
 
 export const getAspOptimizationJobStatus = async (jobId) => {
-  const response = await fetch(`/api/asp-determination/optimize-jobs/${encodeURIComponent(jobId)}/status`)
+  const response = await withNetworkHint(() =>
+    fetch(`/api/asp-determination/optimize-jobs/${encodeURIComponent(jobId)}/status`),
+  )
   if (!response.ok) {
     throw new Error(await parseApiError(response))
   }
@@ -51,7 +75,14 @@ export const getAspOptimizationJobStatus = async (jobId) => {
 }
 
 export const getAspOptimizationJobResult = async (jobId) => {
-  const response = await fetch(`/api/asp-determination/optimize-jobs/${encodeURIComponent(jobId)}/result`)
+  const response = await withNetworkHint(() =>
+    fetch(`/api/asp-determination/optimize-jobs/${encodeURIComponent(jobId)}/result`),
+  )
+  if (response.status === 404) {
+    const notReadyError = new Error('Optimization result is not ready yet.')
+    notReadyError.code = 'JOB_RESULT_NOT_READY'
+    throw notReadyError
+  }
   if (!response.ok) {
     throw new Error(await parseApiError(response))
   }
@@ -69,6 +100,7 @@ export const runAspOptimizationJob = async (requestPayload, { onProgress, pollMs
     const startedAt = Date.now()
     let lastKnownStage = 'Queued'
     let transientStatusErrors = 0
+    let resultNotReadyCount = 0
 
     while (Date.now() - startedAt <= timeoutMs) {
       await new Promise((resolve) => setTimeout(resolve, pollMs))
@@ -98,7 +130,23 @@ export const runAspOptimizationJob = async (requestPayload, { onProgress, pollMs
       }
 
       if (status?.status === 'completed') {
-        const resultPayload = await getAspOptimizationJobResult(jobId)
+        let resultPayload
+        try {
+          resultPayload = await getAspOptimizationJobResult(jobId)
+        } catch (resultError) {
+          if (resultError?.code === 'JOB_RESULT_NOT_READY' && resultNotReadyCount < 8) {
+            resultNotReadyCount += 1
+            if (onProgress) {
+              onProgress({
+                status: 'running',
+                progress_pct: 99,
+                stage: 'Finalizing optimization output...',
+              })
+            }
+            continue
+          }
+          throw resultError
+        }
         if (!resultPayload?.result) {
           throw new Error('Optimization completed but result payload is empty.')
         }

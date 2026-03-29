@@ -128,13 +128,21 @@ export function getScenarioSelectionSummary(result, scenarioFilters) {
   const minGrossMarginIncreasePct = parseOptionalThreshold(scenarioFilters?.minProfitUpliftPct)
   const skuConstraints = scenarioFilters?.productConstraints ?? {}
 
-  const filteredScenarios = enrichedScenarios.filter(
+  const numericFilteredScenarios = enrichedScenarios.filter(
     (scenario) =>
       (minVolumeIncreasePct === null || scenario.volumePct >= minVolumeIncreasePct) &&
       (minRevenueIncreasePct === null || scenario.revenuePct >= minRevenueIncreasePct) &&
-      (minGrossMarginIncreasePct === null || scenario.grossMarginPct >= minGrossMarginIncreasePct) &&
-      isScenarioWithinSkuConstraints(result, scenario.scenarioId, skuConstraints),
+      (minGrossMarginIncreasePct === null || scenario.grossMarginPct >= minGrossMarginIncreasePct),
   )
+
+  const skuFilteredScenarios = numericFilteredScenarios.filter((scenario) =>
+    isScenarioWithinSkuConstraints(result, scenario.scenarioId, skuConstraints),
+  )
+
+  const hasSkuFilters = Object.keys(skuConstraints ?? {}).length > 0
+  const usedSkuFilterFallback =
+    hasSkuFilters && skuFilteredScenarios.length === 0 && numericFilteredScenarios.length > 0
+  const filteredScenarios = usedSkuFilterFallback ? numericFilteredScenarios : skuFilteredScenarios
 
   let bestByMetric = null
   if (filteredScenarios.length) {
@@ -150,7 +158,14 @@ export function getScenarioSelectionSummary(result, scenarioFilters) {
     }
   }
 
-  return { generatedCount, enrichedScenarios, filteredScenarios, bestByMetric, baseGrossMarginPct }
+  return {
+    generatedCount,
+    enrichedScenarios,
+    filteredScenarios,
+    bestByMetric,
+    baseGrossMarginPct,
+    usedSkuFilterFallback,
+  }
 }
 
 export { formatShortPct }
@@ -211,7 +226,10 @@ const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters })
         <div className="mt-3 h-[300px]">
           {chartData.length === 0 ? (
             <div className="flex h-full items-center justify-center rounded border border-dashed border-slate-300 bg-slate-50">
-              <p className="text-sm font-medium text-slate-600">No scenarios match current filters.</p>
+              <p className="px-4 text-center text-sm font-medium text-slate-600">
+                Scenarios were generated, but current filters/SKU bounds removed all visible results. Relax filters or
+                reset SKU-level constraints.
+              </p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">

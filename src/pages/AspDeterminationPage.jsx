@@ -835,6 +835,10 @@ const AspDeterminationPage = () => {
       ),
     [monthProducts, controls],
   )
+  const defaultProductConstraints = useMemo(
+    () => buildDefaultProductConstraints(),
+    [buildDefaultProductConstraints],
+  )
 
   useEffect(() => {
     if (!monthProducts.length) {
@@ -931,7 +935,8 @@ const AspDeterminationPage = () => {
       dirty = true
     }
     ;['aMinVol', 'aMinRev', 'aMinProf'].forEach((filterKey) => {
-      if (next.get(filterKey) === '-100') {
+      const rawValue = next.get(filterKey)
+      if (rawValue === '-100' || rawValue === '0' || rawValue === '0.0' || rawValue === '0.00') {
         next.delete(filterKey)
         dirty = true
       }
@@ -1363,6 +1368,37 @@ const AspDeterminationPage = () => {
     }
   }, [selectionSourceResult, selectedMonth])
 
+  const activeScenarioProductConstraints = useMemo(() => {
+    if (!monthProducts.length) return {}
+    const active = {}
+    let hasActive = false
+
+    for (const item of monthProducts) {
+      const key = item.productName
+      const current = productConstraints[key]
+      const defaults = defaultProductConstraints[key]
+      if (!current || !defaults) continue
+
+      const currentNoChange = Boolean(current.noChange)
+      const defaultNoChange = Boolean(defaults.noChange)
+      const currentMin = Number(current.minPrice)
+      const currentMax = Number(current.maxPrice)
+      const defaultMin = Number(defaults.minPrice)
+      const defaultMax = Number(defaults.maxPrice)
+
+      const minDiff = Math.abs((Number.isFinite(currentMin) ? currentMin : defaultMin) - defaultMin)
+      const maxDiff = Math.abs((Number.isFinite(currentMax) ? currentMax : defaultMax) - defaultMax)
+      const changed = currentNoChange !== defaultNoChange || minDiff > 0.5 || maxDiff > 0.5
+
+      if (changed) {
+        active[key] = current
+        hasActive = true
+      }
+    }
+
+    return hasActive ? active : {}
+  }, [monthProducts, productConstraints, defaultProductConstraints])
+
   const scenarioPanelHeaderSummary = useMemo(
     () =>
       selectionResult
@@ -1370,7 +1406,7 @@ const AspDeterminationPage = () => {
             minVolumeUpliftPct: controls.minVolumeUpliftPct,
             minRevenueUpliftPct: controls.minRevenueUpliftPct,
             minProfitUpliftPct: controls.minProfitUpliftPct,
-            productConstraints,
+            productConstraints: activeScenarioProductConstraints,
           })
         : null,
     [
@@ -1378,7 +1414,7 @@ const AspDeterminationPage = () => {
       controls.minVolumeUpliftPct,
       controls.minRevenueUpliftPct,
       controls.minProfitUpliftPct,
-      productConstraints,
+      activeScenarioProductConstraints,
     ],
   )
 
@@ -2038,7 +2074,10 @@ const AspDeterminationPage = () => {
                       {formatShortPct(scenarioPanelHeaderSummary.bestByMetric.bestGrossMargin.grossMarginPct)}
                     </p>
                   ) : (
-                    <p className="text-xs font-medium text-rose-700">No scenarios match current filters.</p>
+                    <p className="text-xs font-medium text-rose-700">
+                      Scenarios were generated, but current filters/SKU bounds excluded all. Relax filters or reset
+                      SKU-level constraints.
+                    </p>
                   )}
                 </div>
               ) : null}
@@ -2054,7 +2093,7 @@ const AspDeterminationPage = () => {
                       minVolumeUpliftPct: controls.minVolumeUpliftPct,
                       minRevenueUpliftPct: controls.minRevenueUpliftPct,
                       minProfitUpliftPct: controls.minProfitUpliftPct,
-                      productConstraints,
+                      productConstraints: activeScenarioProductConstraints,
                     }}
                   />
                 ) : null}

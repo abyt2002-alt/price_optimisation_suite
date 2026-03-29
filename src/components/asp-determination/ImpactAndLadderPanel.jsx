@@ -64,10 +64,20 @@ const LadderTooltip = ({ active, payload }) => {
 }
 
 const renderSegmentDot = (props) => {
-  const { cx, cy, payload } = props
+  const { cx, cy, payload, index, dataKey } = props
   if (cx === undefined || cy === undefined || !payload) return null
   const color = SEGMENT_COLORS[payload.segmentKey] ?? '#64748B'
-  return <circle cx={cx} cy={cy} r={4.5} fill={color} stroke="#ffffff" strokeWidth={1.6} />
+  return (
+    <circle
+      key={`ladder-dot-${dataKey ?? 'value'}-${payload.productName ?? index ?? 'na'}-${index ?? 0}`}
+      cx={cx}
+      cy={cy}
+      r={4.5}
+      fill={color}
+      stroke="#ffffff"
+      strokeWidth={1.6}
+    />
+  )
 }
 
 const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) => {
