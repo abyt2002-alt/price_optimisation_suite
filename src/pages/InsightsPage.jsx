@@ -9,21 +9,13 @@ import AppLayout from '../components/layout/AppLayout'
 import {
   buildPortfolioElasticityBands,
   buildInsightsPayload,
-  formatYearMonthLabel,
-  getInsightsMonths,
   getProductOptions,
 } from '../utils/insightsUtils'
 
 const InsightsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const monthOptions = useMemo(() => getInsightsMonths(), [])
-  const latestMonth = monthOptions[monthOptions.length - 1]
-
-  const monthParam = searchParams.get('iMonth')
-  const selectedMonth = monthOptions.includes(monthParam) ? monthParam : latestMonth
-
-  const productOptions = useMemo(() => getProductOptions(selectedMonth), [selectedMonth])
+  const productOptions = useMemo(() => getProductOptions(), [])
   const productParam = searchParams.get('iProduct')
   const selectedProduct = productOptions.includes(productParam) ? productParam : productOptions[0]
   const crossProductParam = searchParams.get('iCrossProduct')
@@ -43,8 +35,8 @@ const InsightsPage = () => {
       dirty = true
     }
 
-    if (!next.get('iMonth') && latestMonth) {
-      next.set('iMonth', latestMonth)
+    if (next.has('iMonth')) {
+      next.delete('iMonth')
       dirty = true
     }
 
@@ -66,7 +58,7 @@ const InsightsPage = () => {
     if (dirty) {
       setSearchParams(next, { replace: true })
     }
-  }, [latestMonth, productOptions, searchParams, setSearchParams])
+  }, [productOptions, searchParams, setSearchParams])
 
   const setParams = (patch) => {
     const next = new URLSearchParams(searchParams)
@@ -86,12 +78,11 @@ const InsightsPage = () => {
   const payload = useMemo(
     () =>
       buildInsightsPayload({
-        yearMonth: selectedMonth,
         productName: selectedProduct,
         curveRange,
         sensitivity,
       }),
-    [selectedMonth, selectedProduct, curveRange, sensitivity],
+    [selectedProduct, curveRange, sensitivity],
   )
 
   const portfolioElasticityBands = useMemo(
@@ -99,45 +90,38 @@ const InsightsPage = () => {
     [payload.monthRows, sensitivity],
   )
 
-  const rightSidebar = (
-    <InsightsSidebar
-      month={selectedMonth}
-      monthOptions={monthOptions}
-      product={selectedProduct}
-      productOptions={productOptions}
-      onMonthChange={(value) => {
-        const nextProductOptions = getProductOptions(value)
-        const nextProduct = nextProductOptions.includes(selectedProduct)
-          ? selectedProduct
-          : nextProductOptions[0]
-        const nextCrossProduct = nextProductOptions.includes(selectedCrossProduct)
-          ? selectedCrossProduct
-          : nextProduct
-        setParams({ iMonth: value, iProduct: nextProduct, iCrossProduct: nextCrossProduct })
-      }}
-      onProductChange={(value) => setParams({ iProduct: value })}
-      portfolioElasticityBands={portfolioElasticityBands}
-      onReset={() =>
-        setParams({
-          iMonth: latestMonth,
-          iProduct: getProductOptions(latestMonth)[0],
-          iCrossProduct: getProductOptions(latestMonth)[0],
-        })
-      }
-    />
-  )
+  const rightSidebar = <InsightsSidebar portfolioElasticityBands={portfolioElasticityBands} />
 
   return (
     <AppLayout rightSidebar={rightSidebar}>
       <div className="space-y-5">
         <div className="panel p-5">
-          <h2 className="text-3xl font-bold text-slate-800">Insights</h2>
+          <h2 className="text-3xl font-bold text-slate-800">Pricing strategy review</h2>
           <p className="mt-2 max-w-4xl text-sm font-medium text-slate-600">
-            Analyze demand response, revenue behavior, and product interactions across the portfolio.
+            Select an SKU to review
           </p>
           <p className="mt-1 text-xs font-semibold text-slate-500">
-            Product: {selectedProduct} | Week: {formatYearMonthLabel(selectedMonth)}
+            Season: Winter 2025
           </p>
+        </div>
+
+        <div className="panel p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[260px] flex-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">SKU</label>
+              <select
+                value={selectedProduct}
+                onChange={(event) => setParams({ iProduct: event.target.value })}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand.blue focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                {productOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         <ElasticitySummaryCards

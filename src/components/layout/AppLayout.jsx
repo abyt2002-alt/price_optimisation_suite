@@ -13,7 +13,7 @@ import { useState } from 'react'
 const navigation = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Review Brand Price Ladder', href: '/portfolio?step=1', icon: BarChart3, step: '1' },
-  { name: 'Key Business Insights', href: '/portfolio?step=2', icon: SlidersHorizontal, step: '2' },
+  { name: 'Insights on Pricing Strategy', href: '/portfolio?step=2', icon: SlidersHorizontal, step: '2' },
   { name: 'Optimize Price Ladder', href: '/portfolio?step=3', icon: LineChart, step: '3' },
 ]
 
@@ -127,10 +127,6 @@ const AppLayout = ({ children, rightSidebar }) => {
           <>
             <aside className="hidden w-80 flex-shrink-0 border-l border-slate-200 bg-white lg:block">
               <div className="flex h-full flex-col">
-                <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white p-4">
-                  <Settings className="h-5 w-5 text-brand.blue" />
-                  <h2 className="text-lg font-semibold text-slate-800">Settings</h2>
-                </div>
                 <div className="flex-1 overflow-y-auto p-4">{rightSidebar}</div>
               </div>
             </aside>
@@ -142,11 +138,7 @@ const AppLayout = ({ children, rightSidebar }) => {
                   onClick={() => setIsMobileSidebarOpen(false)}
                 />
                 <div className="absolute bottom-0 right-0 top-0 flex w-full max-w-sm flex-col bg-white shadow-xl">
-                  <div className="flex items-center justify-between border-b border-slate-200 p-4">
-                    <div className="flex items-center gap-2">
-                      <Settings className="h-5 w-5 text-brand.blue" />
-                      <h2 className="text-lg font-semibold text-slate-800">Settings</h2>
-                    </div>
+                  <div className="flex items-center justify-end border-b border-slate-200 p-4">
                     <button
                       onClick={() => setIsMobileSidebarOpen(false)}
                       className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"

@@ -1,25 +1,5 @@
 import { useMemo, useState } from 'react'
-import { RotateCcw, X } from 'lucide-react'
-import { formatYearMonthLabel } from '../../utils/insightsUtils'
-
-const SelectControl = ({ label, value, options, onChange }) => {
-  return (
-    <div className="space-y-1">
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand.blue focus:outline-none focus:ring-2 focus:ring-blue-200"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
+import { X } from 'lucide-react'
 
 const ACTION_CONFIG = {
   reduce: {
@@ -77,10 +57,10 @@ const ActionCard = ({ actionKey, items, onClick }) => {
       <div className="mt-2 grid grid-cols-2 gap-2 rounded-md bg-white/70 p-1.5">
         <div>
           <p className="text-[10px] font-medium text-slate-500">Avg Elasticity</p>
-          <p className="text-xs font-bold text-slate-700">{items.length ? avgElasticity.toFixed(3) : '-'}</p>
+          <p className="text-xs font-bold text-slate-700">{items.length ? avgElasticity.toFixed(2) : '-'}</p>
         </div>
         <div>
-          <p className="text-[10px] font-medium text-slate-500">Avg ASP</p>
+          <p className="text-[10px] font-medium text-slate-500">Avg Price</p>
           <p className="text-xs font-bold text-slate-700">{items.length ? `INR ${Math.round(avgAsp)}` : '-'}</p>
         </div>
       </div>
@@ -88,16 +68,7 @@ const ActionCard = ({ actionKey, items, onClick }) => {
   )
 }
 
-const InsightsSidebar = ({
-  month,
-  monthOptions,
-  product,
-  productOptions,
-  onMonthChange,
-  onProductChange,
-  portfolioElasticityBands,
-  onReset,
-}) => {
+const InsightsSidebar = ({ portfolioElasticityBands }) => {
   const [activeAction, setActiveAction] = useState(null)
 
   const actionItems = useMemo(
@@ -111,39 +82,9 @@ const InsightsSidebar = ({
 
   return (
     <div className="space-y-3">
-      <div className="panel p-4">
-        <h3 className="text-base font-bold text-slate-800">Insights Controls</h3>
-
-        <div className="mt-3 space-y-2.5">
-          <SelectControl
-            label="Week"
-            value={month}
-            options={monthOptions.map((option) => ({ value: option, label: formatYearMonthLabel(option) }))}
-            onChange={onMonthChange}
-          />
-
-          <SelectControl
-            label="Curve Product"
-            value={product}
-            options={productOptions.map((option) => ({ value: option, label: option }))}
-            onChange={onProductChange}
-          />
-
-          <button
-            type="button"
-            onClick={onReset}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Reset Filters
-          </button>
-        </div>
-      </div>
-
       {portfolioElasticityBands && (
         <div className="panel p-4">
-          <h3 className="text-sm font-bold text-slate-800">Portfolio Pricing Actions</h3>
-          <p className="mt-1 text-[11px] text-slate-500">Based on absolute own-price elasticity (|E|)</p>
+          <h3 className="text-sm font-bold text-slate-800">Summary Pricing Insights</h3>
 
           <div className="mt-2.5 space-y-1.5">
             <ActionCard
@@ -178,11 +119,8 @@ const InsightsSidebar = ({
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div>
                 <h4 className="text-sm font-bold text-slate-800">
-                  {ACTION_CONFIG[activeAction].label} - Product Summary
+                  Recommended Action: {ACTION_CONFIG[activeAction].label}
                 </h4>
-                <p className="text-xs text-slate-500">
-                  These are the average elasticity values at average ASP levels.
-                </p>
               </div>
               <button
                 type="button"
@@ -197,11 +135,10 @@ const InsightsSidebar = ({
               <table className="min-w-full divide-y divide-slate-200 text-xs">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Product</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">SKU</th>
                     <th className="px-3 py-2 text-right font-semibold text-slate-600">Avg Elasticity</th>
-                    <th className="px-3 py-2 text-right font-semibold text-slate-600">Avg ASP</th>
-                    <th className="px-3 py-2 text-right font-semibold text-slate-600">Current ASP</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Suggested Action</th>
+                    <th className="px-3 py-2 text-right font-semibold text-slate-600">Current Avg Price</th>
+                    <th className="px-3 py-2 text-right font-semibold text-slate-600">Recommended Price</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -211,10 +148,9 @@ const InsightsSidebar = ({
                     .map((item) => (
                       <tr key={item.productName} className="bg-white">
                         <td className="px-3 py-2 text-slate-700">{item.productName}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-slate-700">{item.avgElasticity.toFixed(3)}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-slate-700">{item.avgElasticity.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right text-slate-700">INR {Math.round(item.avgAsp)}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">INR {Math.round(item.currentAsp)}</td>
-                        <td className="px-3 py-2 text-slate-700">{item.suggestedAction}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">INR {Math.round(item.recommendedPrice)}</td>
                       </tr>
                     ))}
                 </tbody>
