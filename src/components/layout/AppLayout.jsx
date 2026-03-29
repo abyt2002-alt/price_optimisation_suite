@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   BarChart3,
-  Home,
   LineChart,
   Menu,
   Settings,
@@ -11,7 +10,6 @@ import {
 import { useState } from 'react'
 
 const navigation = [
-  { name: 'Home', href: '/', icon: Home },
   { name: 'Review Brand Price Ladder', href: '/portfolio?step=1', icon: BarChart3, step: '1' },
   { name: 'Insights on Pricing Strategy', href: '/portfolio?step=2', icon: SlidersHorizontal, step: '2' },
   { name: 'Optimize Price Ladder', href: '/portfolio?step=3', icon: LineChart, step: '3' },
