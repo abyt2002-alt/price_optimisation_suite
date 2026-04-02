@@ -17,6 +17,9 @@ import { buildDisplayRows } from '../utils/aspDisplayCalculations'
 import { buildStep3SavedScenarioSnapshot } from '../utils/step3SavedScenario'
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+const PRICE_STEP = 50
+const snapToStep = (value, step = PRICE_STEP) => Math.round(Number(value || 0) / step) * step
+const normalizeSegmentOffset = (value) => clamp(snapToStep(value), 0, 150)
 const formatInr = (value) =>
   `INR ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0))}`
 const SEGMENT_ORDER = ['daily', 'core', 'premium']
@@ -95,8 +98,8 @@ const getSegmentRanges = (controls, segmentKey) => {
       return { maxDecrease: 0, maxIncrease: 0, noChange: true }
     }
     return {
-      maxDecrease: clamp(Number(controls.dailyMaxDecrease) || 0, 0, 150),
-      maxIncrease: clamp(Number(controls.dailyMaxIncrease) || 0, 0, 150),
+      maxDecrease: normalizeSegmentOffset(controls.dailyMaxDecrease),
+      maxIncrease: normalizeSegmentOffset(controls.dailyMaxIncrease),
       noChange: false,
     }
   }
@@ -105,8 +108,8 @@ const getSegmentRanges = (controls, segmentKey) => {
       return { maxDecrease: 0, maxIncrease: 0, noChange: true }
     }
     return {
-      maxDecrease: clamp(Number(controls.coreMaxDecrease) || 0, 0, 150),
-      maxIncrease: clamp(Number(controls.coreMaxIncrease) || 0, 0, 150),
+      maxDecrease: normalizeSegmentOffset(controls.coreMaxDecrease),
+      maxIncrease: normalizeSegmentOffset(controls.coreMaxIncrease),
       noChange: false,
     }
   }
@@ -114,18 +117,130 @@ const getSegmentRanges = (controls, segmentKey) => {
     return { maxDecrease: 0, maxIncrease: 0, noChange: true }
   }
   return {
-    maxDecrease: clamp(Number(controls.premiumMaxDecrease) || 0, 0, 150),
-    maxIncrease: clamp(Number(controls.premiumMaxIncrease) || 0, 0, 150),
+    maxDecrease: normalizeSegmentOffset(controls.premiumMaxDecrease),
+    maxIncrease: normalizeSegmentOffset(controls.premiumMaxIncrease),
     noChange: false,
   }
 }
-const clampToProductBand = (value, basePrice) => {
+const getSegmentBounds = (controls, segmentKey) => {
+  if (segmentKey === 'daily') {
+    return {
+      maxDecrease: normalizeSegmentOffset(controls.dailyMaxDecrease),
+      maxIncrease: normalizeSegmentOffset(controls.dailyMaxIncrease),
+    }
+  }
+  if (segmentKey === 'core') {
+    return {
+      maxDecrease: normalizeSegmentOffset(controls.coreMaxDecrease),
+      maxIncrease: normalizeSegmentOffset(controls.coreMaxIncrease),
+    }
+  }
+  return {
+    maxDecrease: normalizeSegmentOffset(controls.premiumMaxDecrease),
+    maxIncrease: normalizeSegmentOffset(controls.premiumMaxIncrease),
+  }
+}
+const clampToProductBand = (
+  value,
+  basePrice,
+  minAllowed = Math.max(1, Number(basePrice || 1) - 150),
+  maxAllowed = Math.max(Math.max(1, Number(basePrice || 1) - 150), Number(basePrice || 1) + 150),
+) => {
   const base = Math.max(1, Number(basePrice) || 1)
-  const minAllowed = Math.max(1, base - 150)
-  const maxAllowed = base + 150
+  const lowerBound = Math.max(1, Number(minAllowed) || 1)
+  const upperBound = Math.max(lowerBound, Number(maxAllowed) || lowerBound)
+  const minOffset = lowerBound - base
+  const maxOffset = upperBound - base
   const parsed = Number(value)
-  const safeValue = Number.isFinite(parsed) ? parsed : base
-  return clamp(safeValue, minAllowed, maxAllowed)
+  const rawOffset = Number.isFinite(parsed) ? parsed - base : 0
+  const snappedOffset = clamp(snapToStep(rawOffset), minOffset, maxOffset)
+  return base + snappedOffset
+}
+const buildHydratedProductConstraints = (monthProducts = [], defaultConstraints = {}, rawConstraints = {}) =>
+  Object.fromEntries(
+    monthProducts.map((product) => {
+      const key = product.productName
+      const basePrice = Number(product.basePrice ?? 1)
+      const defaults = defaultConstraints[key] ?? {
+        noChange: false,
+        minPrice: Math.max(1, basePrice - 150),
+        maxPrice: basePrice + 150,
+      }
+      const current = rawConstraints?.[key]
+      if (!current || typeof current !== 'object') {
+        return [key, defaults]
+      }
+
+      const noChange = Boolean(current.noChange)
+      if (noChange) {
+        return [
+          key,
+          {
+            noChange: true,
+            minPrice: basePrice,
+            maxPrice: basePrice,
+          },
+        ]
+      }
+
+      const minPrice = clampToProductBand(
+        Number.isFinite(Number(current.minPrice)) ? Number(current.minPrice) : defaults.minPrice,
+        basePrice,
+        defaults.minPrice,
+        defaults.maxPrice,
+      )
+      const maxPrice = clampToProductBand(
+        Number.isFinite(Number(current.maxPrice)) ? Number(current.maxPrice) : defaults.maxPrice,
+        basePrice,
+        defaults.minPrice,
+        defaults.maxPrice,
+      )
+
+      return [
+        key,
+        {
+          noChange: false,
+          minPrice: Math.min(minPrice, maxPrice),
+          maxPrice: Math.max(minPrice, maxPrice),
+        },
+      ]
+    }),
+  )
+
+const extractActiveProductConstraints = (monthProducts = [], productConstraints = {}, defaultConstraints = {}) => {
+  if (!monthProducts.length) return {}
+
+  const active = {}
+  let hasActive = false
+
+  for (const item of monthProducts) {
+    const key = item.productName
+    const current = productConstraints[key]
+    const defaults = defaultConstraints[key]
+    if (!current || !defaults) continue
+
+    const currentNoChange = Boolean(current.noChange)
+    const defaultNoChange = Boolean(defaults.noChange)
+    const currentMin = Number(current.minPrice)
+    const currentMax = Number(current.maxPrice)
+    const defaultMin = Number(defaults.minPrice)
+    const defaultMax = Number(defaults.maxPrice)
+
+    const minDiff = Math.abs((Number.isFinite(currentMin) ? currentMin : defaultMin) - defaultMin)
+    const maxDiff = Math.abs((Number.isFinite(currentMax) ? currentMax : defaultMax) - defaultMax)
+    const changed = currentNoChange !== defaultNoChange || minDiff > 0.5 || maxDiff > 0.5
+
+    if (changed) {
+      active[key] = {
+        noChange: currentNoChange,
+        minPrice: Number.isFinite(currentMin) ? currentMin : defaultMin,
+        maxPrice: Number.isFinite(currentMax) ? currentMax : defaultMax,
+      }
+      hasActive = true
+    }
+  }
+
+  return hasActive ? active : {}
 }
 const inferObjectiveFromPrompt = (promptText) => {
   const text = String(promptText ?? '').toLowerCase()
@@ -135,9 +250,10 @@ const inferObjectiveFromPrompt = (promptText) => {
 
 const lerp = (start, end, progress) => start + (end - start) * progress
 const ASP_CACHE_KEY = 'asp_determination_cached_result_v4'
-const ASP_VIEW_STATE_KEY = 'asp_determination_view_state_v1'
+const ASP_VIEW_STATE_KEY = 'asp_determination_view_state_v2'
 const STEP3_SAVED_KEY = 'base_ladder_saved_scenarios_v2'
 let aspInMemoryCache = {}
+let aspInMemoryViewState = null
 
 const xmlEscape = (value) =>
   String(value ?? '')
@@ -321,12 +437,14 @@ const writeCachedResult = ({ selectedMonth, controls, productConstraints, result
 }
 
 const readAspViewState = () => {
+  if (aspInMemoryViewState && typeof aspInMemoryViewState === 'object') return aspInMemoryViewState
   if (typeof window === 'undefined') return null
   try {
     const raw = sessionStorage.getItem(ASP_VIEW_STATE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
+    aspInMemoryViewState = parsed
     return parsed
   } catch {
     return null
@@ -334,12 +452,23 @@ const readAspViewState = () => {
 }
 
 const writeAspViewState = (payload) => {
+  aspInMemoryViewState = payload
   if (typeof window === 'undefined') return
   try {
     sessionStorage.setItem(ASP_VIEW_STATE_KEY, JSON.stringify(payload))
   } catch {
     // ignore snapshot write failures
   }
+}
+
+const getRestorableAspViewState = (snapshot, selectedMonth) => {
+  if (!snapshot || snapshot.selectedMonth !== selectedMonth) return null
+  const restoredDisplay = snapshot.displayResult
+  const hasRows =
+    Array.isArray(restoredDisplay?.optimizedProducts) && restoredDisplay.optimizedProducts.length > 0
+  const hasScenarios =
+    Array.isArray(restoredDisplay?.scenarioSummaries) && restoredDisplay.scenarioSummaries.length > 0
+  return hasRows && hasScenarios ? snapshot : null
 }
 
 const mapProductRow = (row) => ({
@@ -765,6 +894,7 @@ const AspDeterminationPage = () => {
   const [scenarioConfirm, setScenarioConfirm] = useState(null)
   const [savePlanDialog, setSavePlanDialog] = useState({ open: false, name: '' })
   const animationFrameRef = useRef(null)
+  const sessionRestoreAppliedRef = useRef(false)
   const savedDockRef = useRef(null)
 
   const monthOptions = useMemo(() => getInsightsMonths(), [])
@@ -791,14 +921,14 @@ const AspDeterminationPage = () => {
       objective: 'revenue',
       grossMarginPct: clamp(parseNumber(searchParams.get('aGm'), 40), 20, 60),
       prompt: searchParams.get('aPrompt') ?? '',
-      dailyMaxDecrease: clamp(parseNumber(searchParams.get('aDDec'), 100), 0, 150),
-      dailyMaxIncrease: clamp(parseNumber(searchParams.get('aDInc'), 100), 0, 150),
+      dailyMaxDecrease: normalizeSegmentOffset(parseNumber(searchParams.get('aDDec'), 100)),
+      dailyMaxIncrease: normalizeSegmentOffset(parseNumber(searchParams.get('aDInc'), 100)),
       dailyNoChange: parseBool(searchParams.get('aDNo'), false),
-      coreMaxDecrease: clamp(parseNumber(searchParams.get('aCDec'), 100), 0, 150),
-      coreMaxIncrease: clamp(parseNumber(searchParams.get('aCInc'), 100), 0, 150),
+      coreMaxDecrease: normalizeSegmentOffset(parseNumber(searchParams.get('aCDec'), 100)),
+      coreMaxIncrease: normalizeSegmentOffset(parseNumber(searchParams.get('aCInc'), 100)),
       coreNoChange: parseBool(searchParams.get('aCNo'), false),
-      premiumMaxDecrease: clamp(parseNumber(searchParams.get('aPDec'), 100), 0, 150),
-      premiumMaxIncrease: clamp(parseNumber(searchParams.get('aPInc'), 100), 0, 150),
+      premiumMaxDecrease: normalizeSegmentOffset(parseNumber(searchParams.get('aPDec'), 100)),
+      premiumMaxIncrease: normalizeSegmentOffset(parseNumber(searchParams.get('aPInc'), 100)),
       premiumNoChange: parseBool(searchParams.get('aPNo'), false),
       maxPriceChanges: clamp(parseNumber(searchParams.get('aMaxChgCnt'), monthProducts.length), 0, 500),
       minVolumeUpliftPct: parseOptionalFilterParam(searchParams.get('aMinVol'), -100, 500),
@@ -812,23 +942,13 @@ const AspDeterminationPage = () => {
     () =>
       Object.fromEntries(
         monthProducts.map((item) => {
-          const segmentRange = getSegmentRanges(controls, item.segmentKey)
-          if (segmentRange.noChange) {
-            return [
-              item.productName,
-              {
-                noChange: true,
-                minPrice: item.basePrice,
-                maxPrice: item.basePrice,
-              },
-            ]
-          }
+          const segmentBounds = getSegmentBounds(controls, item.segmentKey)
           return [
             item.productName,
             {
               noChange: false,
-              minPrice: Math.max(1, item.basePrice - segmentRange.maxDecrease),
-              maxPrice: item.basePrice + segmentRange.maxIncrease,
+              minPrice: Math.max(1, item.basePrice - segmentBounds.maxDecrease),
+              maxPrice: item.basePrice + segmentBounds.maxIncrease,
             },
           ]
         }),
@@ -839,37 +959,21 @@ const AspDeterminationPage = () => {
     () => buildDefaultProductConstraints(),
     [buildDefaultProductConstraints],
   )
+  const hydratedProductConstraints = useMemo(
+    () => buildHydratedProductConstraints(monthProducts, defaultProductConstraints, productConstraints),
+    [monthProducts, defaultProductConstraints, productConstraints],
+  )
 
   useEffect(() => {
     if (!monthProducts.length) {
       setProductConstraints({})
       return
     }
-    setProductConstraints((prev) => {
-      const defaults = buildDefaultProductConstraints()
-      const next = {}
-      for (const product of monthProducts) {
-        const key = product.productName
-        const existing = prev[key]
-        const noChange = Boolean(existing?.noChange)
-        const minPrice = Number(existing?.minPrice)
-        const maxPrice = Number(existing?.maxPrice)
-        if (noChange) {
-          next[key] = {
-            noChange: true,
-            minPrice: product.basePrice,
-            maxPrice: product.basePrice,
-          }
-          continue
-        }
-        next[key] =
-          Number.isFinite(minPrice) && Number.isFinite(maxPrice)
-            ? { noChange: false, minPrice, maxPrice }
-            : defaults[key]
-      }
-      return next
-    })
-  }, [monthProducts, buildDefaultProductConstraints])
+    const validKeys = new Set(monthProducts.map((item) => item.productName))
+    setProductConstraints((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([productName]) => validKeys.has(productName))),
+    )
+  }, [monthProducts])
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams)
@@ -970,33 +1074,35 @@ const AspDeterminationPage = () => {
 
   useEffect(() => {
     if (!isParamsReady) return
-    if (!displayResult) {
-      setOptimizationResult(baselineResult)
-      setDisplayResult(baselineResult)
-    }
-  }, [isParamsReady, displayResult, baselineResult])
+    if (displayResult) return
+    const snapshot = getRestorableAspViewState(readAspViewState(), selectedMonth)
+    if (snapshot && !sessionRestoreAppliedRef.current) return
+    setOptimizationResult(baselineResult)
+    setDisplayResult(baselineResult)
+  }, [isParamsReady, displayResult, baselineResult, selectedMonth])
 
   useEffect(() => {
     if (!isParamsReady || displayResult) return
-    const snapshot = readAspViewState()
+    const snapshot = getRestorableAspViewState(readAspViewState(), selectedMonth)
     if (!snapshot) return
-    if (snapshot.selectedMonth !== selectedMonth) return
 
     const restoredOptimization = snapshot.optimizationResult
     const restoredDisplay = snapshot.displayResult
-    const hasRows =
-      Array.isArray(restoredDisplay?.optimizedProducts) && restoredDisplay.optimizedProducts.length > 0
-    const hasScenarios =
-      Array.isArray(restoredDisplay?.scenarioSummaries) && restoredDisplay.scenarioSummaries.length > 0
-    if (!hasRows || !hasScenarios) return
-
+    sessionRestoreAppliedRef.current = true
     setOptimizationResult(restoredOptimization ?? restoredDisplay)
     setDisplayResult(restoredDisplay)
     setUiStage(snapshot.uiStage ?? 'workspace')
     setGenerationCollapsed(Boolean(snapshot.generationCollapsed))
     setSelectionCollapsed(Boolean(snapshot.selectionCollapsed))
     setSelectedSegment(snapshot.selectedSegment ?? 'daily')
-    setProductConstraints(snapshot.productConstraints ?? {})
+    const restoredConstraints = snapshot.activeProductConstraints ?? {}
+    setProductConstraints(
+      extractActiveProductConstraints(
+        monthProducts,
+        buildHydratedProductConstraints(monthProducts, defaultProductConstraints, restoredConstraints),
+        defaultProductConstraints,
+      ),
+    )
     setBasePriceEditMap(snapshot.basePriceEditMap ?? {})
     setBasePriceDraftMap({})
     setRecommendedPriceEditMap(snapshot.recommendedPriceEditMap ?? {})
@@ -1005,7 +1111,7 @@ const AspDeterminationPage = () => {
     setOptimizationError('')
     setRunNotice('')
     setJobProgress({ progressPct: 0, stage: '' })
-  }, [isParamsReady, displayResult, selectedMonth])
+  }, [isParamsReady, displayResult, selectedMonth, monthProducts, defaultProductConstraints])
 
   const setParams = (patch) => {
     const next = new URLSearchParams(searchParams)
@@ -1027,14 +1133,14 @@ const AspDeterminationPage = () => {
     const mapped = {}
     if (patch.grossMarginPct !== undefined) mapped.aGm = patch.grossMarginPct
     if (patch.prompt !== undefined) mapped.aPrompt = patch.prompt
-    if (patch.dailyMaxDecrease !== undefined) mapped.aDDec = clamp(Number(patch.dailyMaxDecrease) || 0, 0, 150)
-    if (patch.dailyMaxIncrease !== undefined) mapped.aDInc = clamp(Number(patch.dailyMaxIncrease) || 0, 0, 150)
+    if (patch.dailyMaxDecrease !== undefined) mapped.aDDec = normalizeSegmentOffset(patch.dailyMaxDecrease)
+    if (patch.dailyMaxIncrease !== undefined) mapped.aDInc = normalizeSegmentOffset(patch.dailyMaxIncrease)
     if (patch.dailyNoChange !== undefined) mapped.aDNo = patch.dailyNoChange ? '1' : '0'
-    if (patch.coreMaxDecrease !== undefined) mapped.aCDec = clamp(Number(patch.coreMaxDecrease) || 0, 0, 150)
-    if (patch.coreMaxIncrease !== undefined) mapped.aCInc = clamp(Number(patch.coreMaxIncrease) || 0, 0, 150)
+    if (patch.coreMaxDecrease !== undefined) mapped.aCDec = normalizeSegmentOffset(patch.coreMaxDecrease)
+    if (patch.coreMaxIncrease !== undefined) mapped.aCInc = normalizeSegmentOffset(patch.coreMaxIncrease)
     if (patch.coreNoChange !== undefined) mapped.aCNo = patch.coreNoChange ? '1' : '0'
-    if (patch.premiumMaxDecrease !== undefined) mapped.aPDec = clamp(Number(patch.premiumMaxDecrease) || 0, 0, 150)
-    if (patch.premiumMaxIncrease !== undefined) mapped.aPInc = clamp(Number(patch.premiumMaxIncrease) || 0, 0, 150)
+    if (patch.premiumMaxDecrease !== undefined) mapped.aPDec = normalizeSegmentOffset(patch.premiumMaxDecrease)
+    if (patch.premiumMaxIncrease !== undefined) mapped.aPInc = normalizeSegmentOffset(patch.premiumMaxIncrease)
     if (patch.premiumNoChange !== undefined) mapped.aPNo = patch.premiumNoChange ? '1' : '0'
     if (patch.maxPriceChanges !== undefined) {
       mapped.aMaxChgCnt =
@@ -1072,6 +1178,11 @@ const AspDeterminationPage = () => {
       try {
         setJobProgress({ progressPct: 1, stage: 'Queued' })
         const inferredObjective = inferObjectiveFromPrompt(controls.prompt)
+        const activeProductConstraintPayload = extractActiveProductConstraints(
+          monthProducts,
+          hydratedProductConstraints,
+          defaultProductConstraints,
+        )
         const apiResult = await runAspOptimizationJob(
           {
             selected_month: selectedMonth,
@@ -1083,40 +1194,47 @@ const AspDeterminationPage = () => {
               ...(controls.maxPriceChanges === '' || controls.maxPriceChanges === null || controls.maxPriceChanges === undefined
                 ? {}
                 : { max_changed_count: Number(controls.maxPriceChanges) }),
+              ...(controls.minVolumeUpliftPct === '' || controls.minVolumeUpliftPct === null || controls.minVolumeUpliftPct === undefined
+                ? {}
+                : { min_volume_uplift_pct: Number(controls.minVolumeUpliftPct) }),
+              ...(controls.minRevenueUpliftPct === '' || controls.minRevenueUpliftPct === null || controls.minRevenueUpliftPct === undefined
+                ? {}
+                : { min_revenue_uplift_pct: Number(controls.minRevenueUpliftPct) }),
+              ...(controls.minProfitUpliftPct === '' || controls.minProfitUpliftPct === null || controls.minProfitUpliftPct === undefined
+                ? {}
+                : { min_profit_uplift_pct: Number(controls.minProfitUpliftPct) }),
             },
             segment_constraints: {
               daily_casual: {
                 no_change: Boolean(controls.dailyNoChange),
-                max_decrease: clamp(Number(controls.dailyMaxDecrease) || 0, 0, 150),
-                max_increase: clamp(Number(controls.dailyMaxIncrease) || 0, 0, 150),
+                max_decrease: normalizeSegmentOffset(controls.dailyMaxDecrease),
+                max_increase: normalizeSegmentOffset(controls.dailyMaxIncrease),
               },
               core_plus: {
                 no_change: Boolean(controls.coreNoChange),
-                max_decrease: clamp(Number(controls.coreMaxDecrease) || 0, 0, 150),
-                max_increase: clamp(Number(controls.coreMaxIncrease) || 0, 0, 150),
+                max_decrease: normalizeSegmentOffset(controls.coreMaxDecrease),
+                max_increase: normalizeSegmentOffset(controls.coreMaxIncrease),
               },
               premium: {
                 no_change: Boolean(controls.premiumNoChange),
-                max_decrease: clamp(Number(controls.premiumMaxDecrease) || 0, 0, 150),
-                max_increase: clamp(Number(controls.premiumMaxIncrease) || 0, 0, 150),
+                max_decrease: normalizeSegmentOffset(controls.premiumMaxDecrease),
+                max_increase: normalizeSegmentOffset(controls.premiumMaxIncrease),
               },
             },
             product_constraints: Object.fromEntries(
-              Object.entries(productConstraints).map(([productName, item]) => {
+              Object.entries(activeProductConstraintPayload).map(([productName, item]) => {
                 const product = monthProducts.find((entry) => entry.productName === productName)
                 const basePrice = product?.basePrice ?? 1
                 const segmentKey = product?.segmentKey ?? getSegmentKey(basePrice)
-                const segmentNoChange =
-                  (segmentKey === 'daily' && Boolean(controls.dailyNoChange)) ||
-                  (segmentKey === 'core' && Boolean(controls.coreNoChange)) ||
-                  (segmentKey === 'premium' && Boolean(controls.premiumNoChange))
-                const noChange = segmentNoChange || Boolean(item?.noChange)
-                let minPrice = clampToProductBand(item?.minPrice ?? basePrice - 150, basePrice)
-                let maxPrice = clampToProductBand(item?.maxPrice ?? basePrice + 150, basePrice)
+                const segmentBounds = getSegmentBounds(controls, segmentKey)
+                const noChange = Boolean(item?.noChange)
+                const minAllowed = Math.max(1, basePrice - segmentBounds.maxDecrease)
+                const maxAllowed = basePrice + segmentBounds.maxIncrease
+                let minPrice = clampToProductBand(item?.minPrice ?? minAllowed, basePrice, minAllowed, maxAllowed)
+                let maxPrice = clampToProductBand(item?.maxPrice ?? maxAllowed, basePrice, minAllowed, maxAllowed)
                 if (!noChange && Math.abs(maxPrice - minPrice) < 0.5) {
-                  const segmentRange = getSegmentRanges(controls, segmentKey)
-                  minPrice = clampToProductBand(basePrice - segmentRange.maxDecrease, basePrice)
-                  maxPrice = clampToProductBand(basePrice + segmentRange.maxIncrease, basePrice)
+                  minPrice = clampToProductBand(basePrice - segmentBounds.maxDecrease, basePrice, minAllowed, maxAllowed)
+                  maxPrice = clampToProductBand(basePrice + segmentBounds.maxIncrease, basePrice, minAllowed, maxAllowed)
                 }
                 return [
                   productName,
@@ -1152,7 +1270,7 @@ const AspDeterminationPage = () => {
         setUiStage('selection')
         setGenerationCollapsed(true)
         setSelectionCollapsed(false)
-        writeCachedResult({ selectedMonth, controls, productConstraints, result })
+        writeCachedResult({ selectedMonth, controls, productConstraints: activeProductConstraintPayload, result })
         setJobProgress({ progressPct: 100, stage: 'Completed' })
       } catch (error) {
         setOptimizationError(error?.message || 'Optimization request failed.')
@@ -1162,7 +1280,16 @@ const AspDeterminationPage = () => {
         setIsRunningOptimization(false)
       }
     },
-    [controls, displayResult, selectedMonth, isRunningOptimization, productConstraints, monthProducts],
+    [
+      controls,
+      defaultProductConstraints,
+      displayResult,
+      hydratedProductConstraints,
+      selectedMonth,
+      isRunningOptimization,
+      productConstraints,
+      monthProducts,
+    ],
   )
 
   const selectScenario = useCallback(
@@ -1219,6 +1346,10 @@ const AspDeterminationPage = () => {
 
   useEffect(() => {
     if (isParamsReady && selectedMonth && !displayResult) {
+      const snapshot = getRestorableAspViewState(readAspViewState(), selectedMonth)
+      if (snapshot && !sessionRestoreAppliedRef.current) {
+        return
+      }
       const cached = readCachedResult({ selectedMonth, controls, productConstraints })
       if (cached) {
         setOptimizationResult(cached)
@@ -1243,6 +1374,7 @@ const AspDeterminationPage = () => {
       generationCollapsed,
       selectionCollapsed,
       selectedSegment,
+      activeProductConstraints: productConstraints,
       productConstraints,
       basePriceEditMap,
       recommendedPriceEditMap,
@@ -1272,35 +1404,70 @@ const AspDeterminationPage = () => {
 
   const handleProductConstraintChange = (productName, patch) => {
     setProductConstraints((prev) => {
-      const current = prev[productName] ?? {}
+      const current = hydratedProductConstraints[productName] ?? defaultProductConstraints[productName] ?? {}
       const product = monthProducts.find((item) => item.productName === productName)
       const basePrice = product?.basePrice ?? 1
       const noChange = patch?.noChange !== undefined ? Boolean(patch.noChange) : Boolean(current.noChange)
+      const defaults = defaultProductConstraints[productName] ?? {
+        noChange: false,
+        minPrice: Math.max(1, basePrice - 150),
+        maxPrice: basePrice + 150,
+      }
       if (noChange) {
+        const nextOverride = {
+          noChange: true,
+          minPrice: basePrice,
+          maxPrice: basePrice,
+        }
+        const matchesDefault =
+          Boolean(defaults.noChange) === Boolean(nextOverride.noChange) &&
+          Math.abs(Number(defaults.minPrice) - Number(nextOverride.minPrice)) <= 0.5 &&
+          Math.abs(Number(defaults.maxPrice) - Number(nextOverride.maxPrice)) <= 0.5
+        if (matchesDefault) {
+          const next = { ...prev }
+          delete next[productName]
+          return next
+        }
         return {
           ...prev,
-          [productName]: {
-            noChange: true,
-            minPrice: basePrice,
-            maxPrice: basePrice,
-          },
+          [productName]: nextOverride,
         }
       }
-      const nextMin = clampToProductBand(patch?.minPrice ?? current.minPrice ?? basePrice - 150, basePrice)
-      const nextMax = clampToProductBand(patch?.maxPrice ?? current.maxPrice ?? basePrice + 150, basePrice)
+      const nextMin = clampToProductBand(
+        patch?.minPrice ?? (Boolean(current.noChange) ? defaults.minPrice : current.minPrice) ?? defaults.minPrice,
+        basePrice,
+        defaults.minPrice,
+        defaults.maxPrice,
+      )
+      const nextMax = clampToProductBand(
+        patch?.maxPrice ?? (Boolean(current.noChange) ? defaults.maxPrice : current.maxPrice) ?? defaults.maxPrice,
+        basePrice,
+        defaults.minPrice,
+        defaults.maxPrice,
+      )
+      const nextOverride = {
+        noChange: false,
+        minPrice: Math.min(nextMin, nextMax),
+        maxPrice: Math.max(nextMin, nextMax),
+      }
+      const matchesDefault =
+        Boolean(defaults.noChange) === Boolean(nextOverride.noChange) &&
+        Math.abs(Number(defaults.minPrice) - Number(nextOverride.minPrice)) <= 0.5 &&
+        Math.abs(Number(defaults.maxPrice) - Number(nextOverride.maxPrice)) <= 0.5
+      if (matchesDefault) {
+        const next = { ...prev }
+        delete next[productName]
+        return next
+      }
       return {
         ...prev,
-        [productName]: {
-          noChange: false,
-          minPrice: Math.min(nextMin, nextMax),
-          maxPrice: Math.max(nextMin, nextMax),
-        },
+        [productName]: nextOverride,
       }
     })
   }
 
   const handleResetProductConstraints = () => {
-    setProductConstraints(buildDefaultProductConstraints())
+    setProductConstraints({})
   }
 
   const activeResult = displayResult ?? optimizationResult ?? baselineResult
@@ -1368,36 +1535,10 @@ const AspDeterminationPage = () => {
     }
   }, [selectionSourceResult, selectedMonth])
 
-  const activeScenarioProductConstraints = useMemo(() => {
-    if (!monthProducts.length) return {}
-    const active = {}
-    let hasActive = false
-
-    for (const item of monthProducts) {
-      const key = item.productName
-      const current = productConstraints[key]
-      const defaults = defaultProductConstraints[key]
-      if (!current || !defaults) continue
-
-      const currentNoChange = Boolean(current.noChange)
-      const defaultNoChange = Boolean(defaults.noChange)
-      const currentMin = Number(current.minPrice)
-      const currentMax = Number(current.maxPrice)
-      const defaultMin = Number(defaults.minPrice)
-      const defaultMax = Number(defaults.maxPrice)
-
-      const minDiff = Math.abs((Number.isFinite(currentMin) ? currentMin : defaultMin) - defaultMin)
-      const maxDiff = Math.abs((Number.isFinite(currentMax) ? currentMax : defaultMax) - defaultMax)
-      const changed = currentNoChange !== defaultNoChange || minDiff > 0.5 || maxDiff > 0.5
-
-      if (changed) {
-        active[key] = current
-        hasActive = true
-      }
-    }
-
-    return hasActive ? active : {}
-  }, [monthProducts, productConstraints, defaultProductConstraints])
+  const activeScenarioProductConstraints = useMemo(
+    () => extractActiveProductConstraints(monthProducts, hydratedProductConstraints, defaultProductConstraints),
+    [monthProducts, hydratedProductConstraints, defaultProductConstraints],
+  )
 
   const scenarioPanelHeaderSummary = useMemo(
     () =>
@@ -1420,8 +1561,9 @@ const AspDeterminationPage = () => {
 
   /** Baseline-only has a single summary; a completed Run adds many scenarios. */
   const hasOptimizationScenariosGenerated = useMemo(() => {
-    const n = optimizationResult?.scenarioSummaries?.length ?? 0
-    return n > 1
+    const summaries = optimizationResult?.scenarioSummaries ?? []
+    if (summaries.length > 1) return true
+    return summaries.some((item) => String(item?.scenarioFamily ?? '').toLowerCase() === 'saved plan')
   }, [optimizationResult])
 
   const handleScenarioPickRequest = useCallback(
@@ -1465,7 +1607,7 @@ const AspDeterminationPage = () => {
       return
     }
     selectScenario(scenarioConfirm.scenarioId, true, 'workspace')
-    setSelectionCollapsed(true)
+    setSelectionCollapsed(false)
     setScenarioConfirm(null)
   }, [scenarioConfirm, selectScenario])
 
@@ -1674,7 +1816,7 @@ const AspDeterminationPage = () => {
     writeStep3SavedScenarios(next)
     setUiStage('workspace')
     setGenerationCollapsed(true)
-    setSelectionCollapsed(true)
+    setSelectionCollapsed(false)
     setSaveError('')
     setSaveNotice(`Saved scenario (${next.length})`)
     setTimeout(() => setSaveNotice(''), 2500)
@@ -1759,25 +1901,17 @@ const AspDeterminationPage = () => {
           segmentLabel: row.segmentLabel ?? getSegmentLabel(baseAsp),
         }
       })
-      const baselineRows = savedRows.map((row) => ({
-        ...row,
-        optimizedAsp: row.baseAsp,
-        optimizedVolume: row.currentVolume,
-        optimizedRevenue: row.currentRevenue,
-        optimizedProfit: row.currentProfit,
-        volumeChangePct: 0,
-        revenueChangePct: 0,
-        profitChangePct: 0,
-        basePriceChange: 0,
-        basePriceChangePct: 0,
-        aspChange: 0,
-        aspChangePct: 0,
-      }))
-      const replayedBasePriceMap = Object.fromEntries(
-        savedRows
-          .filter((row) => Math.abs(Number(row.optimizedAsp ?? row.baseAsp) - Number(row.baseAsp)) > 0.5)
-          .map((row) => [row.productName, Math.round(Number(row.optimizedAsp ?? row.baseAsp))]),
-      )
+      const baseTotals = savedItem.baseTotals ?? computeTotalsFromRows(savedRows)
+      const optimizedTotals = savedItem.optimizedTotals ?? computeTotalsFromRows(savedRows)
+      const baselineRevenue = Math.max(1, Number(baseTotals.totalRevenue ?? baseTotals.baseRevenue ?? 0))
+      const baselineProfit = Math.max(1, Math.abs(Number(baseTotals.totalProfit ?? baseTotals.baseProfit ?? 0)))
+      const baselineVolume = Math.max(1, Number(baseTotals.totalVolume ?? baseTotals.baseVolume ?? 0))
+      const totalVolume = Number(optimizedTotals.totalVolume ?? optimizedTotals.optimizedVolume ?? 0)
+      const totalRevenue = Number(optimizedTotals.totalRevenue ?? optimizedTotals.optimizedRevenue ?? 0)
+      const totalProfit = Number(optimizedTotals.totalProfit ?? optimizedTotals.optimizedProfit ?? 0)
+      const revenueLiftPct = (totalRevenue - baselineRevenue) / baselineRevenue
+      const profitLiftPct = (totalProfit - baselineProfit) / baselineProfit
+      const volumeLiftPct = (totalVolume - baselineVolume) / baselineVolume
 
       const savedResult = {
         controls: {},
@@ -1789,37 +1923,72 @@ const AspDeterminationPage = () => {
             scenarioName: savedItem.name || `Price Ladder`,
             scenarioFamily: 'Saved Plan',
             rank: 1,
-            objectiveValue: Number(savedItem.optimizedTotals?.totalRevenue ?? 0),
-            totalVolume: Number(savedItem.optimizedTotals?.totalVolume ?? 0),
-            totalRevenue: Number(savedItem.optimizedTotals?.totalRevenue ?? 0),
-            totalProfit: Number(savedItem.optimizedTotals?.totalProfit ?? 0),
-            volumeLiftPct: 0,
-            revenueLiftPct: 0,
-            profitLiftPct: 0,
+            objectiveValue: totalRevenue,
+            totalVolume,
+            totalRevenue,
+            totalProfit,
+            volumeLiftPct,
+            revenueLiftPct,
+            profitLiftPct,
           },
         ],
         scenarioDetails: {
           [scenarioId]: {
-            optimizedProducts: baselineRows,
+            optimizedProducts: savedRows,
+            optimizedTotals: {
+              totalVolume,
+              totalRevenue,
+              totalProfit,
+            },
+            changedCount: savedRows.filter((row) => Math.abs(Number(row.optimizedAsp ?? 0) - Number(row.baseAsp ?? 0)) >= 0.5).length,
+            revenueLiftPct,
+            profitLiftPct,
+            volumeLiftPct,
           },
         },
-        optimizedProducts: baselineRows,
+        optimizedProducts: savedRows,
         modelContext,
-        baseTotals: savedItem.baseTotals ?? {},
-        optimizedTotals: savedItem.optimizedTotals ?? {},
+        baseTotals: {
+          totalVolume: Number(baseTotals.totalVolume ?? baseTotals.baseVolume ?? 0),
+          totalRevenue: Number(baseTotals.totalRevenue ?? baseTotals.baseRevenue ?? 0),
+          totalProfit: Number(baseTotals.totalProfit ?? baseTotals.baseProfit ?? 0),
+        },
+        currentTotals: {
+          totalVolume: Number(baseTotals.totalVolume ?? baseTotals.baseVolume ?? 0),
+          totalRevenue: Number(baseTotals.totalRevenue ?? baseTotals.baseRevenue ?? 0),
+          totalProfit: Number(baseTotals.totalProfit ?? baseTotals.baseProfit ?? 0),
+        },
+        optimizedTotals: {
+          totalVolume,
+          totalRevenue,
+          totalProfit,
+        },
+        changedCount: savedRows.filter((row) => Math.abs(Number(row.optimizedAsp ?? 0) - Number(row.baseAsp ?? 0)) >= 0.5).length,
+        revenueLiftPct,
+        profitLiftPct,
+        volumeLiftPct,
       }
 
-      setOptimizationResult(savedResult)
+      const preserveGeneratedScenarios =
+        Array.isArray(optimizationResult?.scenarioSummaries) &&
+        optimizationResult.scenarioSummaries.length > 1 &&
+        !optimizationResult.scenarioSummaries.every(
+          (item) => String(item?.scenarioFamily ?? '').toLowerCase() === 'saved plan',
+        )
+
+      if (!preserveGeneratedScenarios) {
+        setOptimizationResult(savedResult)
+      }
       setDisplayResult(savedResult)
-      setBasePriceEditMap(replayedBasePriceMap)
+      setBasePriceEditMap({})
       setBasePriceDraftMap({})
       setRecommendedPriceEditMap({})
       setRecommendedPriceDraftMap({})
-      const availableSegments = new Set(baselineRows.map((row) => row.segmentKey))
+      const availableSegments = new Set(savedRows.map((row) => row.segmentKey))
       const defaultSegment = ['daily', 'core', 'premium'].find((key) => availableSegments.has(key)) ?? null
       setSelectedSegment(defaultSegment)
       setGenerationCollapsed(true)
-      setSelectionCollapsed(true)
+      setSelectionCollapsed(false)
       setUiStage('workspace')
       setSavedDockOpen(false)
       setRunNotice(`Loaded saved plan: ${savedItem.name}`)
@@ -2007,7 +2176,8 @@ const AspDeterminationPage = () => {
                 controls={controls}
                 onControlsChange={applyControlPatch}
                 products={monthProducts}
-                productConstraints={productConstraints}
+                productConstraints={hydratedProductConstraints}
+                defaultProductConstraints={defaultProductConstraints}
                 onProductConstraintChange={handleProductConstraintChange}
               />
 
@@ -2089,6 +2259,7 @@ const AspDeterminationPage = () => {
                   <OptimizationSummaryCards
                     result={selectionResult}
                     onSelectScenario={handleScenarioPickRequest}
+                    activeScenarioId={displayViewResult?.selectedScenarioId ?? optimizationResult?.selectedScenarioId}
                     scenarioFilters={{
                       minVolumeUpliftPct: controls.minVolumeUpliftPct,
                       minRevenueUpliftPct: controls.minRevenueUpliftPct,
@@ -2101,7 +2272,8 @@ const AspDeterminationPage = () => {
                   controls={controls}
                   onControlsChange={applyControlPatch}
                   products={monthProducts}
-                  productConstraints={productConstraints}
+                  productConstraints={hydratedProductConstraints}
+                  defaultProductConstraints={defaultProductConstraints}
                   onProductConstraintChange={handleProductConstraintChange}
                   onResetProductConstraints={handleResetProductConstraints}
                 />

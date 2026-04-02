@@ -1,4 +1,5 @@
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+const STEP = 50
 
 const normalizeSkuLabel = (value) =>
   String(value ?? '')
@@ -9,7 +10,7 @@ const normalizeSkuLabel = (value) =>
 // Min width on SKU column so names stay readable inside narrow segment cards (minmax(0,fr) can collapse to 0).
 const SKU_TABLE_GRID = 'grid grid-cols-[minmax(220px,1.5fr)_84px_88px_84px_84px] gap-2'
 
-const SegmentProductTable = ({ products, productConstraints, onProductConstraintChange }) => {
+const SegmentProductTable = ({ products, productConstraints, defaultProductConstraints = {}, onProductConstraintChange }) => {
   // Single overflow container + inner pr avoids vertical scrollbar overlapping the Max column
   // inside narrow <details> panels (nested overflow-x + overflow-y made the bar paint over inputs).
   return (
@@ -29,8 +30,9 @@ const SegmentProductTable = ({ products, productConstraints, onProductConstraint
           const key = item.productName
           const displaySku = normalizeSkuLabel(item.productName ?? item.skuName ?? item.product_name)
           const c = productConstraints[key] ?? {}
-          const minAllowed = Math.max(1, item.basePrice - 150)
-          const maxAllowed = item.basePrice + 150
+          const defaults = defaultProductConstraints[key] ?? {}
+          const minAllowed = Number.isFinite(defaults.minPrice) ? defaults.minPrice : Math.max(1, item.basePrice - 150)
+          const maxAllowed = Number.isFinite(defaults.maxPrice) ? defaults.maxPrice : item.basePrice + 150
           const noChange = Boolean(c.noChange)
           const minPrice = Number.isFinite(c.minPrice) ? clamp(c.minPrice, minAllowed, maxAllowed) : minAllowed
           const maxPrice = Number.isFinite(c.maxPrice) ? clamp(c.maxPrice, minAllowed, maxAllowed) : maxAllowed
@@ -51,8 +53,6 @@ const SegmentProductTable = ({ products, productConstraints, onProductConstraint
                     const checked = Boolean(event.target.checked)
                     onProductConstraintChange?.(key, {
                       noChange: checked,
-                      minPrice: checked ? item.basePrice : Math.max(1, item.basePrice - 150),
-                      maxPrice: checked ? item.basePrice : item.basePrice + 150,
                     })
                   }}
                   className="h-3.5 w-3.5 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
@@ -63,7 +63,7 @@ const SegmentProductTable = ({ products, productConstraints, onProductConstraint
                 value={Math.round(noChange ? item.basePrice : minPrice)}
                 min={Math.round(minAllowed)}
                 max={Math.round(maxAllowed)}
-                step={1}
+                step={STEP}
                 disabled={noChange}
                 onChange={(event) =>
                   onProductConstraintChange?.(key, {
@@ -79,7 +79,7 @@ const SegmentProductTable = ({ products, productConstraints, onProductConstraint
                 value={Math.round(noChange ? item.basePrice : maxPrice)}
                 min={Math.round(minAllowed)}
                 max={Math.round(maxAllowed)}
-                step={1}
+                step={STEP}
                 disabled={noChange}
                 onChange={(event) =>
                   onProductConstraintChange?.(key, {
@@ -108,6 +108,7 @@ const SegmentColumn = ({
   onRangeChange,
   products,
   productConstraints,
+  defaultProductConstraints,
   onProductConstraintChange,
 }) => {
   return (
@@ -136,7 +137,7 @@ const SegmentColumn = ({
             value={Math.round(maxDecrease)}
             min={0}
             max={150}
-            step={1}
+            step={STEP}
             disabled={Boolean(noChange)}
             onChange={(event) => onRangeChange({ maxDecrease: clamp(Number(event.target.value) || 0, 0, 150), maxIncrease })}
             className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
@@ -149,7 +150,7 @@ const SegmentColumn = ({
             value={Math.round(maxIncrease)}
             min={0}
             max={150}
-            step={1}
+            step={STEP}
             disabled={Boolean(noChange)}
             onChange={(event) => onRangeChange({ maxDecrease, maxIncrease: clamp(Number(event.target.value) || 0, 0, 150) })}
             className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
@@ -164,6 +165,7 @@ const SegmentColumn = ({
         <SegmentProductTable
           products={products}
           productConstraints={productConstraints}
+          defaultProductConstraints={defaultProductConstraints}
           onProductConstraintChange={onProductConstraintChange}
         />
       </details>
@@ -176,6 +178,7 @@ const AspInputGuardrailsPanel = ({
   onControlsChange,
   products = [],
   productConstraints = {},
+  defaultProductConstraints = {},
   onProductConstraintChange,
 }) => {
   const dailyProducts = products.filter((item) => item.segmentKey === 'daily')
@@ -236,6 +239,7 @@ const AspInputGuardrailsPanel = ({
           onRangeChange={({ maxDecrease, maxIncrease }) => onControlsChange({ dailyMaxDecrease: maxDecrease, dailyMaxIncrease: maxIncrease })}
           products={dailyProducts}
           productConstraints={productConstraints}
+          defaultProductConstraints={defaultProductConstraints}
           onProductConstraintChange={onProductConstraintChange}
         />
 
@@ -248,6 +252,7 @@ const AspInputGuardrailsPanel = ({
           onRangeChange={({ maxDecrease, maxIncrease }) => onControlsChange({ coreMaxDecrease: maxDecrease, coreMaxIncrease: maxIncrease })}
           products={coreProducts}
           productConstraints={productConstraints}
+          defaultProductConstraints={defaultProductConstraints}
           onProductConstraintChange={onProductConstraintChange}
         />
 
@@ -260,6 +265,7 @@ const AspInputGuardrailsPanel = ({
           onRangeChange={({ maxDecrease, maxIncrease }) => onControlsChange({ premiumMaxDecrease: maxDecrease, premiumMaxIncrease: maxIncrease })}
           products={premiumProducts}
           productConstraints={productConstraints}
+          defaultProductConstraints={defaultProductConstraints}
           onProductConstraintChange={onProductConstraintChange}
         />
       </div>

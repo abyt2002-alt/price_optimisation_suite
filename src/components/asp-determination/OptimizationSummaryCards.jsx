@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -16,9 +16,8 @@ import {
 const VOLUME_COLOR = '#458EE2'
 const REVENUE_COLOR = '#41C185'
 const GROSS_MARGIN_COLOR = '#FFBD59'
+const PAGE_SIZE = 5
 
-const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)
-const formatCurrency = (value) => `INR ${formatInt(value)}`
 const formatShortPct = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
 
 const ScenarioLegend = () => (
@@ -45,6 +44,9 @@ const ScenarioTooltip = ({ active, payload }) => {
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <p className="text-sm font-semibold text-[#0F172A]">{row.scenarioName}</p>
       <p className="text-xs text-slate-600">Family: {row.scenarioFamily}</p>
+      <p className="mt-1 text-xs text-slate-600">Volume: {formatShortPct(row.volumePct)}</p>
+      <p className="text-xs text-slate-600">Revenue: {formatShortPct(row.revenuePct)}</p>
+      <p className="text-xs text-slate-600">Gross Margin: {formatShortPct(row.grossMarginPct)}</p>
     </div>
   )
 }
@@ -135,14 +137,9 @@ export function getScenarioSelectionSummary(result, scenarioFilters) {
       (minGrossMarginIncreasePct === null || scenario.grossMarginPct >= minGrossMarginIncreasePct),
   )
 
-  const skuFilteredScenarios = numericFilteredScenarios.filter((scenario) =>
+  const filteredScenarios = numericFilteredScenarios.filter((scenario) =>
     isScenarioWithinSkuConstraints(result, scenario.scenarioId, skuConstraints),
   )
-
-  const hasSkuFilters = Object.keys(skuConstraints ?? {}).length > 0
-  const usedSkuFilterFallback =
-    hasSkuFilters && skuFilteredScenarios.length === 0 && numericFilteredScenarios.length > 0
-  const filteredScenarios = usedSkuFilterFallback ? numericFilteredScenarios : skuFilteredScenarios
 
   let bestByMetric = null
   if (filteredScenarios.length) {
@@ -164,76 +161,224 @@ export function getScenarioSelectionSummary(result, scenarioFilters) {
     filteredScenarios,
     bestByMetric,
     baseGrossMarginPct,
-    usedSkuFilterFallback,
   }
 }
 
 export { formatShortPct }
 
+const sortScenarioRows = (rows, sortBy) => {
+  const keyMap = {
+    volume: 'volumePct',
+    revenue: 'revenuePct',
+    grossMargin: 'grossMarginPct',
+    rank: 'rank',
+    name: 'scenarioName',
+  }
+  const metricKey = keyMap[sortBy] ?? 'revenuePct'
+  const next = [...rows]
+
+  next.sort((a, b) => {
+    if (metricKey === 'scenarioName') {
+      return String(a.scenarioName ?? '').localeCompare(String(b.scenarioName ?? ''))
+    }
+    if (metricKey === 'rank') {
+      return (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER)
+    }
+    return (
+      (b[metricKey] ?? -Infinity) - (a[metricKey] ?? -Infinity) ||
+      (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER)
+    )
+  })
+
+  return next
+}
+
+const buildAnchorRows = (rows) => {
+  const pickDistinctBest = (metricKey, excludedIds) =>
+    rows.find((row) => !excludedIds.has(String(row.scenarioId)) && (row[metricKey] ?? -Infinity) > -Infinity) ?? null
+
+  const byVolume = sortScenarioRows(rows, 'volume')
+  const byRevenue = sortScenarioRows(rows, 'revenue')
+  const byGross = sortScenarioRows(rows, 'grossMargin')
+  const selectedIds = new Set()
+
+  const bestVolume = pickDistinctBest('volumePct', selectedIds) ?? byVolume[0] ?? null
+  if (bestVolume) selectedIds.add(String(bestVolume.scenarioId))
+
+  const bestRevenue =
+    byRevenue.find((row) => !selectedIds.has(String(row.scenarioId))) ?? null
+  if (bestRevenue) selectedIds.add(String(bestRevenue.scenarioId))
+
+  const bestGross =
+    byGross.find((row) => !selectedIds.has(String(row.scenarioId))) ?? null
+
+  return [
+    bestVolume ? { ...bestVolume, anchorLabel: 'Max Volume' } : null,
+    bestRevenue ? { ...bestRevenue, anchorLabel: 'Max Revenue' } : null,
+    bestGross ? { ...bestGross, anchorLabel: 'Max Gross Margin' } : null,
+  ].filter(Boolean)
+}
+
+const downloadScenarioCsv = (rows, filename) => {
+  const header = ['Scenario Name', 'Scenario Family', 'Volume %', 'Revenue %', 'Gross Margin %']
+  const csvRows = rows.map((row) => [
+    row.scenarioName,
+    row.scenarioFamily,
+    row.volumePct.toFixed(2),
+    row.revenuePct.toFixed(2),
+    row.grossMarginPct.toFixed(2),
+  ])
+  const csv = [header, ...csvRows]
+    .map((line) =>
+      line
+        .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+        .join(','),
+    )
+    .join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters }) => {
-  const { filteredScenarios } = useMemo(
+  const [viewMode, setViewMode] = useState('anchor')
+  const [sortBy, setSortBy] = useState('revenue')
+  const [page, setPage] = useState(1)
+
+  const { filteredScenarios, generatedCount } = useMemo(
     () => getScenarioSelectionSummary(result, scenarioFilters),
     [result, scenarioFilters],
   )
 
-  const chartData = useMemo(() => {
-    const sortedBy = (metricKey) => {
-      const rows = [...filteredScenarios]
-      rows.sort((a, b) => (b[metricKey] ?? 0) - (a[metricKey] ?? 0) || (a.rank ?? 0) - (b.rank ?? 0))
-      return rows
-    }
-
-    const selectedIds = new Set()
-    const byVolume = sortedBy('volumePct')
-    const byRevenue = sortedBy('revenuePct')
-    const byGross = sortedBy('grossMarginPct')
-
-    const bestVolume = byVolume.filter((s) => (s.volumePct ?? 0) > 0).length ? byVolume.find((s) => (s.volumePct ?? 0) > 0) : byVolume[0] ?? null
-    if (bestVolume) selectedIds.add(String(bestVolume.scenarioId))
-
-    const bestRevenue =
-      byRevenue.filter((s) => (s.revenuePct ?? 0) > 0 && !selectedIds.has(String(s.scenarioId)))[0] ?? byRevenue.find((s) => !selectedIds.has(String(s.scenarioId))) ?? null
-    if (bestRevenue) selectedIds.add(String(bestRevenue.scenarioId))
-
-    const bestGross =
-      byGross.filter((s) => (s.grossMarginPct ?? 0) > 0 && !selectedIds.has(String(s.scenarioId)))[0] ?? byGross.find((s) => !selectedIds.has(String(s.scenarioId))) ?? null
-
-    const ordered = [bestVolume, bestRevenue, bestGross].filter(Boolean)
-
-    return ordered.map((row, idx) => ({
+  const anchorRows = useMemo(() => buildAnchorRows(filteredScenarios), [filteredScenarios])
+  const allRows = useMemo(() => sortScenarioRows(filteredScenarios, sortBy), [filteredScenarios, sortBy])
+  const isAllMode = viewMode === 'all'
+  const sourceRows = isAllMode ? allRows : anchorRows
+  const pageCount = Math.max(1, Math.ceil(sourceRows.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount)
+  const pagedRows = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE
+    return sourceRows.slice(start, start + PAGE_SIZE).map((row) => ({
       ...row,
-      viewIndex: idx + 1,
-      xLabel: row.scenarioName.length > 24 ? `${row.scenarioName.slice(0, 22)}..` : row.scenarioName,
+      xLabel:
+        !isAllMode && row.anchorLabel
+          ? row.anchorLabel
+          : row.scenarioName.length > 22
+            ? `${row.scenarioName.slice(0, 20)}..`
+            : row.scenarioName,
     }))
-  }, [filteredScenarios])
+  }, [sourceRows, safePage, isAllMode])
 
   const maxAbsPct = Math.max(
     5,
-    ...chartData.map((row) => Math.max(Math.abs(row.volumePct), Math.abs(row.revenuePct), Math.abs(row.grossMarginPct))),
+    ...pagedRows.map((row) =>
+      Math.max(Math.abs(row.volumePct ?? 0), Math.abs(row.revenuePct ?? 0), Math.abs(row.grossMarginPct ?? 0)),
+    ),
   )
   const yLimit = Math.ceil(maxAbsPct / 5) * 5
 
+  const showingStart = sourceRows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
+  const showingEnd = Math.min(sourceRows.length, safePage * PAGE_SIZE)
+
+  const handleToggleView = () => {
+    setViewMode((prev) => (prev === 'all' ? 'anchor' : 'all'))
+    setPage(1)
+  }
+
+  const handleSortChange = (event) => {
+    setSortBy(event.target.value)
+    setPage(1)
+  }
+
+  const handleDownload = () => {
+    const rows = isAllMode ? allRows : anchorRows
+    const filename = isAllMode ? 'all_filtered_scenarios.csv' : 'anchor_scenarios.csv'
+    downloadScenarioCsv(rows, filename)
+  }
+
   return (
     <div className="panel p-4">
-      <h3 className="text-base font-semibold text-[#0F172A]">View and compare scenarios</h3>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={handleToggleView}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-[#2563EB] hover:bg-slate-50"
+        >
+          {isAllMode ? `Show Anchor ${anchorRows.length}` : `Show All (${generatedCount || filteredScenarios.length})`}
+        </button>
+        <select
+          value={sortBy}
+          onChange={handleSortChange}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+        >
+          <option value="revenue">Sort by Revenue %</option>
+          <option value="volume">Sort by Volume %</option>
+          <option value="grossMargin">Sort by Gross Margin %</option>
+          <option value="rank">Sort by Rank</option>
+          <option value="name">Sort by Scenario Name</option>
+        </select>
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Download CSV
+        </button>
+      </div>
 
-      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-        <p className="mb-2 text-[11px] font-medium text-slate-600">
-          Scenarios selected to surface the highest positive volume %, revenue %, and gross margin % vs base (up to
-          three distinct scenarios). Change filters to see more.
-        </p>
+      <p className="mb-3 text-sm font-medium text-slate-600">
+        {isAllMode
+          ? `Showing ${showingStart}-${showingEnd} of ${sourceRows.length}`
+          : `Anchor view (Max Volume / Max Revenue / Max Gross Margin). Showing ${showingStart}-${showingEnd} of ${sourceRows.length}`}
+      </p>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-3">
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-[#0F172A]">View and compare scenarios</h3>
+            <p className="mt-1 text-[11px] font-medium text-slate-600">
+              Scenarios selected to surface the highest positive volume %, revenue %, and gross margin % vs base (up to
+              three distinct scenarios). Change filters to see more.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={safePage <= 1}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="text-sm font-semibold text-slate-700">
+              Page {safePage} / {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
+              disabled={safePage >= pageCount}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
 
         <div className="mt-3 h-[300px]">
-          {chartData.length === 0 ? (
+          {pagedRows.length === 0 ? (
             <div className="flex h-full items-center justify-center rounded border border-dashed border-slate-300 bg-slate-50">
               <p className="px-4 text-center text-sm font-medium text-slate-600">
-                Scenarios were generated, but current filters/SKU bounds removed all visible results. Relax filters or
-                reset SKU-level constraints.
+                Scenarios were generated, but current filters or SKU bounds removed all visible results.
               </p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 18, right: 14, left: 4, bottom: 22 }}>
+              <BarChart data={pagedRows} margin={{ top: 18, right: 14, left: 4, bottom: 22 }}>
                 <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
                 <ReferenceLine y={0} stroke="#64748B" strokeWidth={1} />
                 <XAxis
@@ -259,7 +404,7 @@ const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters })
                     fontSize={11}
                     fontWeight={800}
                   />
-                  {chartData.map((entry) => (
+                  {pagedRows.map((entry) => (
                     <Cell key={`vol-${entry.scenarioId}`} fill={VOLUME_COLOR} />
                   ))}
                 </Bar>
@@ -273,7 +418,7 @@ const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters })
                     fontSize={11}
                     fontWeight={800}
                   />
-                  {chartData.map((entry) => (
+                  {pagedRows.map((entry) => (
                     <Cell key={`rev-${entry.scenarioId}`} fill={REVENUE_COLOR} />
                   ))}
                 </Bar>
@@ -287,7 +432,7 @@ const OptimizationSummaryCards = ({ result, onSelectScenario, scenarioFilters })
                     fontSize={11}
                     fontWeight={800}
                   />
-                  {chartData.map((entry) => (
+                  {pagedRows.map((entry) => (
                     <Cell key={`gm-${entry.scenarioId}`} fill={GROSS_MARGIN_COLOR} />
                   ))}
                 </Bar>

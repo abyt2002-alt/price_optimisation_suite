@@ -54,6 +54,19 @@ def _safe_float(value: Any, fallback: float = 0.0) -> float:
     return parsed
 
 
+def _snap_to_step(value: Any, step: float = 50.0) -> float:
+    numeric = _safe_float(value, 0.0)
+    return float(round(numeric / step) * step)
+
+
+def _snap_price_to_band(value: Any, base_price: float, min_offset: float = -150.0, max_offset: float = 150.0) -> float:
+    base = max(1.0, float(base_price))
+    raw_price = _safe_float(value, base)
+    offset = _snap_to_step(raw_price - base)
+    clamped_offset = max(max(1.0 - base, min_offset), min(max_offset, offset))
+    return float(base + clamped_offset)
+
+
 def _progress(callback: ProgressCallback | None, pct: int, stage: str) -> None:
     if callback:
         callback(max(0, min(100, int(pct))), str(stage or ""))
@@ -77,8 +90,8 @@ def _normalize_segment_constraints(
         if not isinstance(raw, dict):
             raw = {}
         no_change = bool(raw.get("no_change", False))
-        max_decrease = max(0.0, min(150.0, _safe_float(raw.get("max_decrease"), 100.0)))
-        max_increase = max(0.0, min(150.0, _safe_float(raw.get("max_increase"), 100.0)))
+        max_decrease = max(0.0, min(150.0, _snap_to_step(raw.get("max_decrease", 100.0))))
+        max_increase = max(0.0, min(150.0, _snap_to_step(raw.get("max_increase", 100.0))))
         normalized[key] = {
             "no_change": no_change,
             "max_decrease": max_decrease,
@@ -87,8 +100,12 @@ def _normalize_segment_constraints(
     return normalized
 
 
-def _allowed_offsets_for_segment(segment_constraint: dict[str, float | bool]) -> list[float]:
-    if bool(segment_constraint.get("no_change", False)):
+def _allowed_offsets_for_segment(
+    segment_constraint: dict[str, float | bool],
+    *,
+    ignore_no_change: bool = False,
+) -> list[float]:
+    if bool(segment_constraint.get("no_change", False)) and not ignore_no_change:
         return [0.0]
 
     max_decrease = _safe_float(segment_constraint.get("max_decrease"), 100.0)
@@ -107,7 +124,12 @@ def _normalize_scenario_filters(raw_filters: dict[str, float] | None) -> dict[st
     source = raw_filters or {}
     min_volume = _safe_float(source.get("min_volume_uplift_pct"), -9999.0) / 100.0
     min_revenue = _safe_float(source.get("min_revenue_uplift_pct"), -9999.0) / 100.0
-    min_profit = _safe_float(source.get("min_profit_uplift_pct"), -9999.0) / 100.0
+    # Frontend control is labeled as gross-margin increase. Keep the legacy request key
+    # for compatibility, but align backend filtering to the same metric the UI applies.
+    min_gross_margin_delta_pct = _safe_float(
+        source.get("min_gross_margin_delta_pct"),
+        _safe_float(source.get("min_profit_uplift_pct"), -9999.0),
+    )
     max_changed_count_raw = source.get("max_changed_count")
     max_changed_count = -1.0
     if max_changed_count_raw is not None:
@@ -117,7 +139,7 @@ def _normalize_scenario_filters(raw_filters: dict[str, float] | None) -> dict[st
     return {
         "min_volume_uplift": min_volume,
         "min_revenue_uplift": min_revenue,
-        "min_profit_uplift": min_profit,
+        "min_gross_margin_delta_pct": min_gross_margin_delta_pct,
         "max_changed_count": max_changed_count,
     }
 
@@ -136,8 +158,8 @@ def _normalize_product_constraints(
         if not isinstance(raw, dict):
             raw = {}
         no_change = bool(raw.get("no_change", False))
-        min_price = max(1.0, _safe_float(raw.get("min_price"), base_price - 100.0))
-        max_price = max(1.0, _safe_float(raw.get("max_price"), base_price + 100.0))
+        min_price = _snap_price_to_band(raw.get("min_price", base_price - 100.0), base_price)
+        max_price = _snap_price_to_band(raw.get("max_price", base_price + 100.0), base_price)
         if min_price > max_price:
             min_price, max_price = max_price, min_price
         normalized[name] = {
@@ -179,19 +201,20 @@ def _scenario_passes_filters(
 ) -> bool:
     base_volume = max(1.0, float(base_totals.get("total_volume", 0.0)))
     base_revenue = max(1.0, float(base_totals.get("total_revenue", 0.0)))
-    base_profit = float(base_totals.get("total_profit", 0.0))
-    if abs(base_profit) < 1e-9:
-        base_profit = 1.0
-
     volume_uplift = (float(totals["total_volume"]) - base_volume) / base_volume
     revenue_uplift = (float(totals["total_revenue"]) - base_revenue) / base_revenue
-    profit_uplift = (float(totals["total_profit"]) - base_profit) / abs(base_profit)
+    base_profit = float(base_totals.get("total_profit", 0.0))
+    base_gross_margin_pct = (base_profit / base_revenue) * 100.0 if abs(base_revenue) > 1e-9 else 0.0
+    scenario_profit = float(totals.get("total_profit", 0.0))
+    scenario_revenue = float(totals.get("total_revenue", 0.0))
+    scenario_gross_margin_pct = (scenario_profit / scenario_revenue) * 100.0 if abs(scenario_revenue) > 1e-9 else 0.0
+    gross_margin_delta_pct = scenario_gross_margin_pct - base_gross_margin_pct
 
     max_changed_count = int(_safe_float(scenario_filters.get("max_changed_count"), -1.0))
     return (
         volume_uplift >= _safe_float(scenario_filters.get("min_volume_uplift"), -9999.0)
         and revenue_uplift >= _safe_float(scenario_filters.get("min_revenue_uplift"), -9999.0)
-        and profit_uplift >= _safe_float(scenario_filters.get("min_profit_uplift"), -9999.0)
+        and gross_margin_delta_pct >= _safe_float(scenario_filters.get("min_gross_margin_delta_pct"), -9999.0)
         and (max_changed_count < 0 or int(changed_count) <= max_changed_count)
     )
 
@@ -1156,12 +1179,16 @@ def optimize_asp_portfolio(
     unit_costs = _build_unit_costs(base_prices)
     segment_constraints = _normalize_segment_constraints(request.segment_constraints)
     scenario_filters = _normalize_scenario_filters(request.scenario_filters)
-    product_constraints = _normalize_product_constraints(request.product_constraints, sorted_rows, base_prices)
+    raw_product_constraints = request.product_constraints if isinstance(request.product_constraints, dict) else {}
+    product_constraints = _normalize_product_constraints(raw_product_constraints, sorted_rows, base_prices)
     product_segments = [_segment_for_base_price(price) for price in base_prices]
     allowed_offsets_by_product = [
         _apply_product_constraint_to_offsets(
             base_price=base_prices[index],
-            allowed_offsets=_allowed_offsets_for_segment(segment_constraints.get(product_segments[index], {})),
+            allowed_offsets=_allowed_offsets_for_segment(
+                segment_constraints.get(product_segments[index], {}),
+                ignore_no_change=str(sorted_rows[index].get("productName", "")) in raw_product_constraints,
+            ),
             product_constraint=product_constraints.get(str(sorted_rows[index].get("productName", "")), {}),
         )
         for index in range(len(sorted_rows))

@@ -108,7 +108,7 @@ const SegmentWorkspacePanel = ({
   }
 
   return (
-    <div className="panel overflow-hidden p-4">
+    <div className="panel p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-lg font-bold text-slate-800">Adjust Price Ladder</h3>
@@ -149,24 +149,22 @@ const SegmentWorkspacePanel = ({
         ) : null}
       </div>
 
-      <div className="space-y-4">
-        {segments.map((segment) => {
-          const isActiveSegment = selectedSegment != null && segment.key === selectedSegment
-          const isExpanded = isActiveSegment
-          const detailRows = segment.rows
-            .slice()
-            .sort((a, b) => (b.baseAsp ?? b.currentAsp) - (a.baseAsp ?? a.currentAsp))
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
+        <div className="xl:sticky xl:top-3 xl:self-start">
+          <div className="space-y-3">
+            {segments.map((segment) => {
+              const isActiveSegment = selectedSegment != null && segment.key === selectedSegment
+              const contributionPct = totalRecommendedRevenue <= 0 ? 0 : (segment.recRevenue / totalRecommendedRevenue) * 100
 
-          return (
-            <div
-              key={segment.key}
-              className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,20%)_minmax(0,80%)] xl:items-start"
-            >
-              {/* Reference card — aligned with this row’s collapsible; sticky within viewport */}
-              <div className="xl:sticky xl:top-2 xl:z-10 xl:self-start">
-                <div
-                  className={`rounded-lg border p-3 ${
-                    isActiveSegment ? 'border-slate-400 bg-slate-100 shadow-sm' : 'border-slate-200 bg-white'
+              return (
+                <button
+                  key={`${segment.key}-summary`}
+                  type="button"
+                  onClick={() => onSelectSegment?.(segment.key)}
+                  className={`block w-full rounded-lg border p-3 text-left transition ${
+                    isActiveSegment
+                      ? 'border-slate-400 bg-slate-100 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -186,24 +184,34 @@ const SegmentWorkspacePanel = ({
                   <div className="mt-2 rounded border border-slate-200 bg-white px-2 py-1.5 text-[11px]">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-slate-500">Revenue Contribution</p>
-                      <p className="font-bold text-slate-800">
-                        {formatPct(totalRecommendedRevenue <= 0 ? 0 : (segment.recRevenue / totalRecommendedRevenue) * 100)}
-                      </p>
+                      <p className="font-bold text-slate-800">{formatPct(contributionPct)}</p>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <div
                         className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-                        style={{
-                          width: `${Math.min(100, totalRecommendedRevenue <= 0 ? 0 : (segment.recRevenue / totalRecommendedRevenue) * 100)}%`,
-                        }}
+                        style={{ width: `${Math.min(100, contributionPct)}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-[10px] font-semibold text-slate-500">Avg elasticity: {segment.avgElasticity.toFixed(2)}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                      Avg elasticity: {segment.avgElasticity.toFixed(2)}
+                    </p>
                   </div>
-                </div>
-              </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
-              <div className="min-w-0">
+        <div className="min-w-0 space-y-4">
+          {segments.map((segment) => {
+            const isActiveSegment = selectedSegment != null && segment.key === selectedSegment
+            const isExpanded = isActiveSegment
+            const detailRows = segment.rows
+              .slice()
+              .sort((a, b) => (b.baseAsp ?? b.currentAsp) - (a.baseAsp ?? a.currentAsp))
+
+            return (
+              <div key={segment.key} className="min-w-0">
                 <div
                   className={`overflow-hidden rounded-lg border transition ${
                     isExpanded ? 'border-slate-400 bg-slate-50/40 shadow-sm' : 'border-slate-200 bg-white'
@@ -231,8 +239,8 @@ const SegmentWorkspacePanel = ({
                     <div className="border-t border-slate-200 bg-white">
                       <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-100 px-3 py-2">
                         <p className="text-[11px] font-semibold text-slate-500">
-                          Make edits in multiples of INR 50. Maximum increase or decrease is 150 INR from each SKU&apos;s base
-                          price.
+                          Make edits in multiples of INR 50. Maximum increase or decrease is 150 INR from each SKU&apos;s
+                          base price.
                         </p>
                       </div>
 
@@ -267,11 +275,17 @@ const SegmentWorkspacePanel = ({
                                     <div className="min-w-0 line-clamp-2 break-words text-[13px] font-semibold leading-4 text-slate-800">
                                       {normalizeProductLabel(row.productName)}
                                     </div>
-                                    <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
-                                    <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
+                                    <div className="text-right text-[12px] font-bold text-slate-700">
+                                      {formatElasticity(elasticity)}
+                                    </div>
+                                    <div className="text-right text-[12px] font-bold text-emerald-700">
+                                      {formatPct(contributionPct)}
+                                    </div>
 
                                     <div className="text-right">
-                                      <span className="text-[12px] font-bold text-slate-700">{formatCurrency(currentBase)}</span>
+                                      <span className="text-[12px] font-bold text-slate-700">
+                                        {formatCurrency(currentBase)}
+                                      </span>
                                     </div>
 
                                     <div className="text-center text-[12px] font-bold text-slate-400">{'->'}</div>
@@ -323,6 +337,7 @@ const SegmentWorkspacePanel = ({
                               {detailRows.map((row) => {
                                 const elasticity = parseNumeric(row.ownElasticity, -1)
                                 const contributionPct = getContributionPctForSegment(row, segment.recRevenue)
+
                                 return (
                                   <div
                                     key={row.productName}
@@ -331,11 +346,17 @@ const SegmentWorkspacePanel = ({
                                     <div className="min-w-0 line-clamp-2 break-words text-[13px] font-semibold leading-4 text-slate-800">
                                       {normalizeProductLabel(row.productName)}
                                     </div>
-                                    <div className="text-right text-[12px] font-bold text-slate-700">{formatElasticity(elasticity)}</div>
-                                    <div className="text-right text-[12px] font-bold text-emerald-700">{formatPct(contributionPct)}</div>
+                                    <div className="text-right text-[12px] font-bold text-slate-700">
+                                      {formatElasticity(elasticity)}
+                                    </div>
+                                    <div className="text-right text-[12px] font-bold text-emerald-700">
+                                      {formatPct(contributionPct)}
+                                    </div>
 
                                     <div className="text-right">
-                                      <span className="text-[12px] font-bold text-slate-700">{formatCurrency(row.baseAsp)}</span>
+                                      <span className="text-[12px] font-bold text-slate-700">
+                                        {formatCurrency(row.baseAsp)}
+                                      </span>
                                     </div>
 
                                     <div className="text-center text-[12px] font-bold text-slate-400">{'->'}</div>
@@ -351,7 +372,10 @@ const SegmentWorkspacePanel = ({
                                         min={getSliderBounds(row.baseAsp).min}
                                         max={getSliderBounds(row.baseAsp).max}
                                         step={50}
-                                        value={getSliderValue(recommendedInputValues?.[row.productName] ?? row.optimizedAsp, row.baseAsp)}
+                                        value={getSliderValue(
+                                          recommendedInputValues?.[row.productName] ?? row.optimizedAsp,
+                                          row.baseAsp,
+                                        )}
                                         onChange={(event) => handleRecommendedSliderChange(row, event.target.value)}
                                         className="h-1.5 w-full cursor-pointer accent-[#2563EB]"
                                         aria-label={`${row.productName} recommended price slider`}
@@ -376,17 +400,12 @@ const SegmentWorkspacePanel = ({
                   ) : null}
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
 export default SegmentWorkspacePanel
-
-
-
-
-

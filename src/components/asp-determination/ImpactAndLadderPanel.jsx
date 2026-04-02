@@ -97,77 +97,85 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
         (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName),
     )
 
-  const stickyMetricsClass = sticky
-    ? 'sticky top-2 z-20 -mx-4 border-b border-slate-200 bg-white/95 px-4 pb-4 pt-0 backdrop-blur supports-[backdrop-filter]:bg-white/80'
-    : ''
+  const metricsBlock = (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MetricBarCard label="Volume" baseValue={baseVolume} newValue={newVolume} />
+        <MetricBarCard label="Revenue" baseValue={baseRevenue} newValue={newRevenue} isCurrency />
+        <MetricBarCard label="Gross Margin" baseValue={baseGrossMargin} newValue={newGrossMargin} isRate />
+      </div>
+      <p className="text-[10px] font-medium leading-snug text-slate-500">
+        Projections reflect both a baseline forecast and the impact of price adjustments. Growth rates are Y-o-Y
+        comparison with the same season.
+      </p>
+    </div>
+  )
 
   return (
-    <div className="panel p-4">
-      <div className="flex flex-col gap-4">
-        <h3 className="text-base font-bold text-slate-800">Current Price Ladder and Projected Business Impact</h3>
-        <div className={`space-y-3 ${stickyMetricsClass}`}>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <MetricBarCard label="Volume" baseValue={baseVolume} newValue={newVolume} />
-            <MetricBarCard label="Revenue" baseValue={baseRevenue} newValue={newRevenue} isCurrency />
-            <MetricBarCard label="Gross Margin" baseValue={baseGrossMargin} newValue={newGrossMargin} isRate />
+    <div className="space-y-4">
+      {sticky ? (
+        <div className="sticky top-20 z-30">
+          <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
+            {metricsBlock}
           </div>
-          <p className="text-[10px] font-medium leading-snug text-slate-500">
-            Projections reflect both a baseline forecast and the impact of price adjustments. Growth rates are Y-o-Y
-            comparison with the same season.
-          </p>
         </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-800">Brand Price Ladder</p>
-            <button
-              type="button"
-              onClick={onOpenLadderModal}
-              className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Expand
-            </button>
-          </div>
-          <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-700">
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-0 w-6 border-t-[3px] border-[#475569]" style={{ borderTopStyle: 'dashed' }} />
-              Base Ladder
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-0 w-6 border-t-[3px] border-[#0F766E]" />
-              Adjusted Ladder
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#1D4ED8]" />
-              Daily Casual
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#EA580C]" />
-              Core Plus
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
-              Premium
-            </span>
-          </div>
-          <div className="h-[250px] cursor-pointer" onClick={onOpenLadderModal}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={ladderRows} margin={{ top: 8, right: 8, left: 0, bottom: 18 }}>
-                <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
-                <XAxis dataKey="productName" tick={{ fontSize: 9 }} interval={0} angle={-18} textAnchor="end" height={68} />
-                <YAxis tick={{ fontSize: 10, fontWeight: 600 }} />
-                <Tooltip content={<LadderTooltip />} />
-                <Line
-                  type="stepAfter"
-                  dataKey="baseAsp"
-                  stroke="#475569"
-                  strokeWidth={2.8}
-                  strokeDasharray="5 4"
-                  dot={renderSegmentDot}
-                />
-                <Line type="stepAfter" dataKey="optimizedAsp" stroke="#0F766E" strokeWidth={3} dot={renderSegmentDot} />
-              </ComposedChart>
-            </ResponsiveContainer>
+      ) : null}
+      <div className="panel p-4">
+        <div className="flex flex-col gap-4">
+          <h3 className="text-base font-bold text-slate-800">Current Price Ladder and Projected Business Impact</h3>
+          {!sticky ? metricsBlock : null}
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-800">Brand Price Ladder</p>
+              <button
+                type="button"
+                onClick={onOpenLadderModal}
+                className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Expand
+              </button>
+            </div>
+            <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-700">
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-0 w-6 border-t-[3px] border-[#475569]" style={{ borderTopStyle: 'dashed' }} />
+                Base Ladder
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-0 w-6 border-t-[3px] border-[#0F766E]" />
+                Adjusted Ladder
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#1D4ED8]" />
+                Daily Casual
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#EA580C]" />
+                Core Plus
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
+                Premium
+              </span>
+            </div>
+            <div className="h-[250px] cursor-pointer" onClick={onOpenLadderModal}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={ladderRows} margin={{ top: 8, right: 8, left: 0, bottom: 18 }}>
+                  <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
+                  <XAxis dataKey="productName" tick={{ fontSize: 9 }} interval={0} angle={-18} textAnchor="end" height={68} />
+                  <YAxis tick={{ fontSize: 10, fontWeight: 600 }} />
+                  <Tooltip content={<LadderTooltip />} />
+                  <Line
+                    type="stepAfter"
+                    dataKey="baseAsp"
+                    stroke="#475569"
+                    strokeWidth={2.8}
+                    strokeDasharray="5 4"
+                    dot={renderSegmentDot}
+                  />
+                  <Line type="stepAfter" dataKey="optimizedAsp" stroke="#0F766E" strokeWidth={3} dot={renderSegmentDot} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>

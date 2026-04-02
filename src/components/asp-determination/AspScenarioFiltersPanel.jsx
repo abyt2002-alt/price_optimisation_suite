@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+const STEP = 50
 
 const normalizeSkuLabel = (value) =>
   String(value ?? '')
@@ -46,6 +47,7 @@ const NumberInput = ({ label, value, onChange, min = -100, max = 500, step = 1, 
 const ProductFilterTable = ({
   products = [],
   productConstraints = {},
+  defaultProductConstraints = {},
   onProductConstraintChange,
 }) => {
   return (
@@ -65,8 +67,9 @@ const ProductFilterTable = ({
           const key = item.productName
           const displaySku = normalizeSkuLabel(item.productName ?? item.skuName ?? item.product_name)
           const c = productConstraints[key] ?? {}
-          const minAllowed = Math.max(1, item.basePrice - 150)
-          const maxAllowed = item.basePrice + 150
+          const defaults = defaultProductConstraints[key] ?? {}
+          const minAllowed = Number.isFinite(defaults.minPrice) ? defaults.minPrice : Math.max(1, item.basePrice - 150)
+          const maxAllowed = Number.isFinite(defaults.maxPrice) ? defaults.maxPrice : item.basePrice + 150
           const noChange = Boolean(c.noChange)
           const minPrice = Number.isFinite(c.minPrice) ? clamp(c.minPrice, minAllowed, maxAllowed) : minAllowed
           const maxPrice = Number.isFinite(c.maxPrice) ? clamp(c.maxPrice, minAllowed, maxAllowed) : maxAllowed
@@ -85,8 +88,6 @@ const ProductFilterTable = ({
                     const checked = Boolean(event.target.checked)
                     onProductConstraintChange?.(key, {
                       noChange: checked,
-                      minPrice: checked ? item.basePrice : Math.max(1, item.basePrice - 150),
-                      maxPrice: checked ? item.basePrice : item.basePrice + 150,
                     })
                   }}
                   className="h-3.5 w-3.5 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
@@ -97,7 +98,7 @@ const ProductFilterTable = ({
                 value={Math.round(noChange ? item.basePrice : minPrice)}
                 min={Math.round(minAllowed)}
                 max={Math.round(maxAllowed)}
-                step={1}
+                step={STEP}
                 disabled={noChange}
                 onChange={(event) =>
                   onProductConstraintChange?.(key, {
@@ -113,7 +114,7 @@ const ProductFilterTable = ({
                 value={Math.round(noChange ? item.basePrice : maxPrice)}
                 min={Math.round(minAllowed)}
                 max={Math.round(maxAllowed)}
-                step={1}
+                step={STEP}
                 disabled={noChange}
                 onChange={(event) =>
                   onProductConstraintChange?.(key, {
@@ -138,6 +139,7 @@ const AspScenarioFiltersPanel = ({
   onControlsChange,
   products = [],
   productConstraints = {},
+  defaultProductConstraints = {},
   onProductConstraintChange,
   onResetProductConstraints,
 }) => {
@@ -239,6 +241,7 @@ const AspScenarioFiltersPanel = ({
             <ProductFilterTable
               products={filteredProducts}
               productConstraints={productConstraints}
+              defaultProductConstraints={defaultProductConstraints}
               onProductConstraintChange={onProductConstraintChange}
             />
           </>

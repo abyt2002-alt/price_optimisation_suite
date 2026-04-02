@@ -1,6 +1,12 @@
 import unittest
 
-from backend.services.asp_optimization_service import _evaluate_prices
+from backend.services.asp_optimization_service import (
+    _evaluate_prices,
+    _normalize_scenario_filters,
+    _normalize_segment_constraints,
+    _normalize_product_constraints,
+    _scenario_passes_filters,
+)
 from backend.utils.elasticity_utils import (
     build_cross_elasticity_matrix,
     build_own_elasticities,
@@ -74,6 +80,80 @@ class ElasticityBehaviorTests(unittest.TestCase):
         self.assertEqual(len(cross_base), len(rows))
         self.assertTrue(all(len(r) == len(rows) for r in cross_base))
         self.assertTrue(all(v > 0 for v in base_volumes))
+
+    def test_scenario_filters_normalize_numeric_thresholds(self):
+        normalized = _normalize_scenario_filters(
+            {
+                "min_volume_uplift_pct": 3,
+                "min_revenue_uplift_pct": 4,
+                "min_profit_uplift_pct": 2.5,
+                "max_changed_count": 6,
+            }
+        )
+
+        self.assertAlmostEqual(normalized["min_volume_uplift"], 0.03, places=6)
+        self.assertAlmostEqual(normalized["min_revenue_uplift"], 0.04, places=6)
+        self.assertAlmostEqual(normalized["min_gross_margin_delta_pct"], 2.5, places=6)
+        self.assertEqual(normalized["max_changed_count"], 6.0)
+
+    def test_constraint_values_snap_to_50_step(self):
+        segment_constraints = _normalize_segment_constraints(
+            {
+                "daily_casual": {"max_decrease": 72, "max_increase": 126},
+            }
+        )
+        self.assertEqual(segment_constraints["daily_casual"]["max_decrease"], 50.0)
+        self.assertEqual(segment_constraints["daily_casual"]["max_increase"], 150.0)
+
+        product_constraints = _normalize_product_constraints(
+            {
+                "A": {"min_price": 372, "max_price": 431},
+            },
+            sorted_rows=[{"productName": "A"}],
+            base_prices=[349.0],
+        )
+        self.assertEqual(product_constraints["A"]["min_price"], 349.0)
+        self.assertEqual(product_constraints["A"]["max_price"], 449.0)
+
+    def test_scenario_filter_uses_gross_margin_delta_not_profit_uplift(self):
+        base_totals = {
+            "total_volume": 100.0,
+            "total_revenue": 1000.0,
+            "total_profit": 200.0,  # 20% gross margin
+        }
+        candidate_totals = {
+            "total_volume": 105.0,
+            "total_revenue": 1100.0,
+            "total_profit": 253.0,  # 23% gross margin
+        }
+
+        self.assertTrue(
+            _scenario_passes_filters(
+                totals=candidate_totals,
+                base_totals=base_totals,
+                scenario_filters={
+                    "min_volume_uplift": 0.02,
+                    "min_revenue_uplift": 0.05,
+                    "min_gross_margin_delta_pct": 2.0,
+                    "max_changed_count": 5.0,
+                },
+                changed_count=3,
+            )
+        )
+
+        self.assertFalse(
+            _scenario_passes_filters(
+                totals=candidate_totals,
+                base_totals=base_totals,
+                scenario_filters={
+                    "min_volume_uplift": 0.02,
+                    "min_revenue_uplift": 0.05,
+                    "min_gross_margin_delta_pct": 3.5,
+                    "max_changed_count": 5.0,
+                },
+                changed_count=3,
+            )
+        )
 
 
 if __name__ == "__main__":
