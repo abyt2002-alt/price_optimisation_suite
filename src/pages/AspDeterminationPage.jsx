@@ -1040,7 +1040,7 @@ const AspDeterminationPage = () => {
     }
     ;['aMinVol', 'aMinRev', 'aMinProf'].forEach((filterKey) => {
       const rawValue = next.get(filterKey)
-      if (rawValue === '-100' || rawValue === '0' || rawValue === '0.0' || rawValue === '0.00') {
+      if (rawValue === '-100') {
         next.delete(filterKey)
         dirty = true
       }

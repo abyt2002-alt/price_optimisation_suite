@@ -17,15 +17,18 @@ const SEGMENT_COLORS = {
 const formatInt = (value) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value))
 const formatCurrency = (value) => `INR ${formatInt(value)}`
 const formatPct = (value) => `${Number(value).toFixed(1)}%`
+const normalizeNearZero = (value, epsilon = 0.0005) => (Math.abs(Number(value) || 0) < epsilon ? 0 : Number(value) || 0)
 const formatSignedPct = (value) => {
-  const pct = Number(value) * 100
-  const sign = pct >= 0 ? '+' : ''
+  const pct = normalizeNearZero(Number(value) * 100, 0.05)
+  const sign = pct > 0 ? '+' : ''
   return `${sign}${pct.toFixed(1)}%`
 }
 
 const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false, isRate = false }) => {
-  const deltaPct = isRate ? (newValue - baseValue) / 100 : baseValue === 0 ? 0 : (newValue - baseValue) / baseValue
-  const isPositive = deltaPct >= 0
+  const rawDeltaPct = isRate ? (newValue - baseValue) / 100 : baseValue === 0 ? 0 : (newValue - baseValue) / baseValue
+  const deltaPct = normalizeNearZero(rawDeltaPct)
+  const tone =
+    deltaPct > 0 ? 'positive' : deltaPct < 0 ? 'negative' : 'neutral'
   const width = Math.min(100, Math.abs(deltaPct * 100))
   const fromText = isRate ? formatPct(baseValue) : isCurrency ? formatCurrency(baseValue) : formatInt(baseValue)
   const toText = isRate ? formatPct(newValue) : isCurrency ? formatCurrency(newValue) : formatInt(newValue)
@@ -34,7 +37,15 @@ const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false, isRate 
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <div className="mt-1 flex items-end justify-between gap-2">
-        <p className={`text-2xl font-extrabold leading-none ${isPositive ? 'text-emerald-700' : 'text-rose-700'}`}>
+        <p
+          className={`text-2xl font-extrabold leading-none ${
+            tone === 'positive'
+              ? 'text-emerald-700'
+              : tone === 'negative'
+                ? 'text-rose-700'
+                : 'text-slate-700'
+          }`}
+        >
           {formatSignedPct(deltaPct)}
         </p>
         <p className="text-[11px] font-semibold text-slate-600">
@@ -43,7 +54,13 @@ const MetricBarCard = ({ label, baseValue, newValue, isCurrency = false, isRate 
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
         <div
-          className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`}
+          className={`h-full rounded-full ${
+            tone === 'positive'
+              ? 'bg-emerald-500'
+              : tone === 'negative'
+                ? 'bg-rose-500'
+                : 'bg-slate-300'
+          }`}
           style={{ width: `${width}%` }}
         />
       </div>
