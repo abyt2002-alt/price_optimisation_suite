@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { buildDisplayRows } from './aspDisplayCalculations.js'
+import { buildDisplayRows, computeDriftPct } from './aspDisplayCalculations.js'
 
 const testOwnElasticityResponse = () => {
   const rows = [
@@ -58,6 +58,10 @@ const testCrossElasticityResponse = () => {
   const modelContext = {
     ownElasticities: [-1.2, -1.1],
     betaPpu: [(-1.2 * 1000) / 799, (-1.1 * 1000) / 899],
+    crossMatrix: [
+      [0, -0.2],
+      [-0.2, 0],
+    ],
     gammaMatrix: [
       [0, 0],
       [0, 0],
@@ -88,6 +92,60 @@ const testCrossElasticityResponse = () => {
   assert.ok(unchangedProductEdited.optimizedVolume > unchangedProductNoChange.optimizedVolume)
 }
 
+const testScenarioVolumesStayAnchoredDuringWorkspaceEdits = () => {
+  const rows = [
+    {
+      productName: 'Brand 799 | cotton',
+      baseAsp: 799,
+      currentAsp: 799,
+      optimizedAsp: 849,
+      currentVolume: 1000,
+      optimizedVolume: 920,
+    },
+    {
+      productName: 'Brand 899 | cotton',
+      baseAsp: 899,
+      currentAsp: 899,
+      optimizedAsp: 949,
+      currentVolume: 1000,
+      optimizedVolume: 940,
+    },
+  ]
+  const modelContext = {
+    ownElasticities: [-1.2, -1.1],
+    crossMatrix: [
+      [0, -0.2],
+      [-0.2, 0],
+    ],
+    gammaMatrix: [
+      [0, 0],
+      [0, 0],
+    ],
+    basePrices: [799, 899],
+    baseVolumes: [1000, 1000],
+  }
+
+  const noEdit = buildDisplayRows({
+    rows,
+    selectedMonth: '2024-W31',
+    modelContext,
+  })
+  const edited = buildDisplayRows({
+    rows,
+    selectedMonth: '2024-W31',
+    recommendedPriceEditMap: { 'Brand 799 | cotton': 899 },
+    modelContext,
+  })
+  const drift0 = 1 + computeDriftPct('Brand 799 | cotton', '2024-W31')
+  const drift1 = 1 + computeDriftPct('Brand 899 | cotton', '2024-W31')
+
+  assert.equal(noEdit[0].optimizedVolume, 920 * drift0)
+  assert.equal(noEdit[1].optimizedVolume, 940 * drift1)
+  assert.ok(edited[0].optimizedVolume < noEdit[0].optimizedVolume)
+  assert.ok(edited[1].optimizedVolume > noEdit[1].optimizedVolume)
+}
+
 testOwnElasticityResponse()
 testCrossElasticityResponse()
+testScenarioVolumesStayAnchoredDuringWorkspaceEdits()
 console.log('aspDisplayCalculations.test.js passed')

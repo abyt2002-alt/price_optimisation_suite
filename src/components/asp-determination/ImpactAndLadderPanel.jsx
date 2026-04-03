@@ -97,7 +97,7 @@ const renderSegmentDot = (props) => {
   )
 }
 
-const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) => {
+export const ImpactSummaryMetrics = ({ rows = [], sticky = false }) => {
   const baseVolume = rows.reduce((sum, row) => sum + (row.currentVolume ?? 0), 0)
   const newVolume = rows.reduce((sum, row) => sum + (row.optimizedVolume ?? 0), 0)
   const baseRevenue = rows.reduce((sum, row) => sum + (row.currentRevenue ?? 0), 0)
@@ -106,13 +106,6 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
   const newProfit = rows.reduce((sum, row) => sum + (row.optimizedProfit ?? 0), 0)
   const baseGrossMargin = baseRevenue === 0 ? 0 : (baseProfit / baseRevenue) * 100
   const newGrossMargin = newRevenue === 0 ? 0 : (newProfit / newRevenue) * 100
-
-  const ladderRows = rows
-    .slice()
-    .sort(
-      (a, b) =>
-        (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName),
-    )
 
   const metricsBlock = (
     <div className="space-y-3">
@@ -128,19 +121,31 @@ const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, sticky = false }) 
     </div>
   )
 
+  if (!sticky) return metricsBlock
+
+  return (
+    <div className="sticky top-2 z-30">
+      <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
+        {metricsBlock}
+      </div>
+    </div>
+  )
+}
+
+const ImpactAndLadderPanel = ({ rows = [], onOpenLadderModal, showMetrics = true, sticky = false }) => {
+  const ladderRows = rows
+    .slice()
+    .sort(
+      (a, b) =>
+        (a.baseAsp ?? a.currentAsp) - (b.baseAsp ?? b.currentAsp) || a.productName.localeCompare(b.productName),
+    )
+
   return (
     <div className="space-y-4">
-      {sticky ? (
-        <div className="sticky top-20 z-30">
-          <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
-            {metricsBlock}
-          </div>
-        </div>
-      ) : null}
+      {showMetrics ? <ImpactSummaryMetrics rows={rows} sticky={sticky} /> : null}
       <div className="panel p-4">
         <div className="flex flex-col gap-4">
           <h3 className="text-base font-bold text-slate-800">Current Price Ladder and Projected Business Impact</h3>
-          {!sticky ? metricsBlock : null}
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-bold text-slate-800">Brand Price Ladder</p>

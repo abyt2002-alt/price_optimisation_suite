@@ -58,6 +58,7 @@ const SegmentWorkspacePanel = ({
   onResetToBaseScenario,
   onResetBasePrices,
   selectedScenarioName = '',
+  summaryStickyTopClass = 'xl:top-3',
 }) => {
   const isBaseOnly = mode === 'base'
 
@@ -150,7 +151,7 @@ const SegmentWorkspacePanel = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
-        <div className="xl:sticky xl:top-3 xl:self-start">
+        <div className={`xl:sticky xl:self-start ${summaryStickyTopClass}`}>
           <div className="space-y-3">
             {segments.map((segment) => {
               const isActiveSegment = selectedSegment != null && segment.key === selectedSegment

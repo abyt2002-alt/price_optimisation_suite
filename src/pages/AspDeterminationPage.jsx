@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Download, Loader2, Play, RotateCcw, Trash2 }
 import AppLayout from '../components/layout/AppLayout'
 import AspInputGuardrailsPanel from '../components/asp-determination/AspInputGuardrailsPanel'
 import AspScenarioFiltersPanel from '../components/asp-determination/AspScenarioFiltersPanel'
-import ImpactAndLadderPanel from '../components/asp-determination/ImpactAndLadderPanel'
+import ImpactAndLadderPanel, { ImpactSummaryMetrics } from '../components/asp-determination/ImpactAndLadderPanel'
 import SegmentWorkspacePanel from '../components/asp-determination/SegmentWorkspacePanel'
 import LadderComparisonChart from '../components/asp-determination/LadderComparisonChart'
 import OptimizationSummaryCards, {
@@ -2289,11 +2289,12 @@ const AspDeterminationPage = () => {
         )}
 
         {displayViewResult && (
-          <>
+          <div className="space-y-4">
+            <ImpactSummaryMetrics rows={displayViewResult.optimizedProducts} sticky />
             <ImpactAndLadderPanel
               rows={displayViewResult.optimizedProducts}
               onOpenLadderModal={() => setIsLadderModalOpen(true)}
-              sticky
+              showMetrics={false}
             />
             <SegmentWorkspacePanel
               rows={displayViewResult.optimizedProducts}
@@ -2310,8 +2311,9 @@ const AspDeterminationPage = () => {
               onResetToBaseScenario={handleResetToBaseScenario}
               onResetBasePrices={handleResetBasePrices}
               selectedScenarioName={selectedScenarioName}
+              summaryStickyTopClass="xl:top-36"
             />
-          </>
+          </div>
         )}
         {isLadderModalOpen && displayViewResult && (
           <div
